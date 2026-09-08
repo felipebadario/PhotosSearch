@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from app.config import (GOOGLE_DRIVE_FOLDER_URL, PHOTOS_DIR, JPEG_EXTENSIONS,
@@ -29,7 +30,8 @@ def main():
         print(f"JPG/JPEG encontrados no Drive: {len(images)}", flush=True)
         if not images:
             raise RuntimeError("Nenhum JPG/JPEG encontrado na pasta e subpastas.")
-        def download_one(item):
+        retry_queue = []
+        def download_one(item, is_retry=False):
             nonlocal downloaded, skipped, errors, total_bytes
             i, entry = item
             if stop.is_set():
@@ -48,9 +50,23 @@ def main():
             temporary = destination.with_suffix(destination.suffix + ".part")
             print(f"Baixando {i}/{len(images)}: {entry.path}", flush=True)
             try:
-                result = gdown.download(id=entry.id, output=str(temporary), quiet=True, use_cookies=False)
+                # O Drive nega o arquivo quando o mesmo ID recebe muitos acessos em
+                # sequência (comum em builds seguidos); poucas tentativas com espera
+                # curta costumam liberar sem sobrecarregar o restante do acervo.
+                result = last_exc = None
+                for attempt in range(3):
+                    try:
+                        result = gdown.download(id=entry.id, output=str(temporary), quiet=True, use_cookies=False)
+                        last_exc = None
+                    except Exception as exc:
+                        result, last_exc = None, exc
+                    if result:
+                        break
+                    temporary.unlink(missing_ok=True)
+                    if attempt < 2:
+                        time.sleep(3 * (attempt + 1))
                 if not result:
-                    raise RuntimeError("O Google Drive não entregou o arquivo.")
+                    raise last_exc or RuntimeError("O Google Drive não entregou o arquivo.")
                 from PIL import Image
                 with Image.open(temporary) as image:
                     if image.format not in {"JPEG", "MPO"}:
@@ -69,14 +85,27 @@ def main():
                 temporary.unlink(missing_ok=True)
                 print(f"Falha em {entry.path}: {exc}", flush=True)
                 with accounting:
-                    errors += 1
-                    if errors >= 3 and downloaded == 0:
-                        stop.set()
+                    if not is_retry and not stop.is_set():
+                        # Primeira falha após as tentativas curtas, sem parada
+                        # definitiva (limite de disco/rostos): adia para uma
+                        # rodada final, depois que o restante do acervo já tiver
+                        # dado tempo do bloqueio por excesso de acessos passar.
+                        retry_queue.append(item)
+                    else:
+                        errors += 1
+                        if errors >= 3 and downloaded == 0:
+                            stop.set()
         # Apenas no preparo do acervo: quatro streams de 512 KiB em disco.
         # O servidor continua com um único worker e uma inferência por vez.
         with ThreadPoolExecutor(max_workers=4) as pool:
             for _ in pool.map(download_one, enumerate(images, 1)):
                 pass
+        if retry_queue and not stop.is_set():
+            print(f"Aguardando para tentar novamente {len(retry_queue)} arquivo(s) negados por excesso de acessos...", flush=True)
+            time.sleep(20)
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                for _ in pool.map(lambda item: download_one(item, is_retry=True), retry_queue):
+                    pass
     except Exception as exc:
         errors += 1
         print(f"Não foi possível concluir o download: {exc}", flush=True)
