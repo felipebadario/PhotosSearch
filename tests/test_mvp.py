@@ -122,6 +122,23 @@ class TestSearch(unittest.TestCase):
 
 
 class TestPreparation(unittest.TestCase):
+    def test_parallel_download_respects_total_disk_budget(self):
+        with scratch() as directory:
+            root = Path(directory)
+            entries = [SimpleNamespace(id=str(i), path=f"{i}.JPG", local_path=str(root / f"{i}.JPG"))
+                       for i in range(8)]
+            content = jpeg()
+            def download(**kwargs):
+                Path(kwargs["output"]).write_bytes(content)
+                return kwargs["output"]
+            with patch.multiple(download_photos, PHOTOS_DIR=root, MAX_PHOTOS_BYTES=len(content) * 2), \
+                    patch.object(download_photos, "photo_files", side_effect=lambda: list(root.glob("*.JPG"))), \
+                    patch("gdown.download_folder", return_value=entries), \
+                    patch("gdown.download", side_effect=download):
+                self.assertEqual(download_photos.main(), 1)
+            self.assertEqual(len(list(root.glob("*.JPG"))), 2)
+            self.assertEqual(list(root.glob("*.part")), [])
+
     def test_mpo_jpeg_primary_frame(self):
         output = io.BytesIO()
         Image.new("RGB", (120, 80), "white").save(
