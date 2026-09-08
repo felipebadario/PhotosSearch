@@ -106,15 +106,18 @@ def main():
                         errors += 1
                         if errors >= 3 and downloaded == 0:
                             stop.set()
-        # Apenas no preparo do acervo: quatro streams de 512 KiB em disco.
-        # O servidor continua com um único worker e uma inferência por vez.
-        with ThreadPoolExecutor(max_workers=4) as pool:
+        # Apenas no preparo do acervo: duas streams de 512 KiB em disco. Um
+        # acervo de milhares de arquivos anônimos já é agressivo o bastante
+        # para o Drive; menos paralelismo reduz a chance de bloqueio por
+        # excesso de acessos. O servidor continua com um único worker e uma
+        # inferência por vez.
+        with ThreadPoolExecutor(max_workers=2) as pool:
             for _ in pool.map(download_one, enumerate(images, 1)):
                 pass
         if retry_queue and not stop.is_set():
             print(f"Aguardando para tentar novamente {len(retry_queue)} arquivo(s) negados por excesso de acessos...", flush=True)
             time.sleep(20)
-            with ThreadPoolExecutor(max_workers=4) as pool:
+            with ThreadPoolExecutor(max_workers=2) as pool:
                 for _ in pool.map(lambda item: download_one(item, is_retry=True), retry_queue):
                     pass
     except Exception as exc:
