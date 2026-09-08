@@ -1,5 +1,6 @@
 """Baixa JPG/JPEG recursivamente, sem OAuth. Arquivos existentes são preservados."""
 import os
+from collections import deque
 from pathlib import Path
 import sys
 import threading
@@ -31,6 +32,10 @@ def main():
         if not images:
             raise RuntimeError("Nenhum JPG/JPEG encontrado na pasta e subpastas.")
         retry_queue = []
+        # Detecta bloqueio sustentado do Drive (não só falha pontual de um arquivo):
+        # se as últimas tentativas foram todas negadas, insistir só desperdiça o
+        # orçamento de minutos do build gratuito, às vezes por horas.
+        recent = deque(maxlen=15)
         def download_one(item, is_retry=False):
             nonlocal downloaded, skipped, errors, total_bytes
             i, entry = item
@@ -60,7 +65,7 @@ def main():
                         last_exc = None
                     except Exception as exc:
                         result, last_exc = None, exc
-                    if result:
+                    if result or stop.is_set():
                         break
                     temporary.unlink(missing_ok=True)
                     if attempt < 2:
@@ -81,15 +86,21 @@ def main():
                     temporary.replace(destination)
                     total_bytes += destination.stat().st_size
                     downloaded += 1
+                    recent.append(True)
             except Exception as exc:
                 temporary.unlink(missing_ok=True)
                 print(f"Falha em {entry.path}: {exc}", flush=True)
                 with accounting:
+                    recent.append(False)
+                    if len(recent) == recent.maxlen and not any(recent):
+                        print("Últimas tentativas todas negadas: Drive parece ter bloqueado "
+                              "este IP por excesso de acessos. Parando em vez de insistir.", flush=True)
+                        stop.set()
                     if not is_retry and not stop.is_set():
                         # Primeira falha após as tentativas curtas, sem parada
-                        # definitiva (limite de disco/rostos): adia para uma
-                        # rodada final, depois que o restante do acervo já tiver
-                        # dado tempo do bloqueio por excesso de acessos passar.
+                        # definitiva (limite de disco/rostos ou bloqueio sustentado):
+                        # adia para uma rodada final, depois que o restante do
+                        # acervo já tiver dado tempo do bloqueio pontual passar.
                         retry_queue.append(item)
                     else:
                         errors += 1
