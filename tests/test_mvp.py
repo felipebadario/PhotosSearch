@@ -122,6 +122,17 @@ class TestSearch(unittest.TestCase):
 
 
 class TestPreparation(unittest.TestCase):
+    def test_mpo_jpeg_primary_frame(self):
+        output = io.BytesIO()
+        Image.new("RGB", (120, 80), "white").save(
+            output, format="MPO", save_all=True,
+            append_images=[Image.new("RGB", (120, 80), "black")])
+        with Image.open(io.BytesIO(output.getvalue())) as image:
+            self.assertEqual(image.format, "MPO")
+        decoded = load_image(output.getvalue())
+        self.assertEqual(decoded.shape, (80, 120, 3))
+        self.assertGreater(decoded.mean(), 250)
+
     def test_build_stops_on_download_error(self):
         with patch("build_render.subprocess.run", return_value=SimpleNamespace(returncode=1)) as run:
             self.assertEqual(build_render.main(), 1)
