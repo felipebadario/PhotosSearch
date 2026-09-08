@@ -28,11 +28,11 @@ def load_image(source):
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             with Image.open(io.BytesIO(source) if isinstance(source, (bytes, bytearray)) else source) as image:
-                if image.format not in {"JPEG", "PNG", "WEBP"}:
+                if image.format not in {"JPEG", "MPO", "PNG", "WEBP"}:
                     raise InvalidImage("Envie uma imagem JPG, PNG ou WebP. Para HEIC, converta para JPG.")
                 if image.width * image.height > MAX_IMAGE_PIXELS:
                     raise InvalidImage("Imagem muito grande. Envie uma foto de até 50 megapixels.")
-                if image.format != "JPEG" and image.width * image.height > MAX_NON_JPEG_PIXELS:
+                if image.format not in {"JPEG", "MPO"} and image.width * image.height > MAX_NON_JPEG_PIXELS:
                     raise InvalidImage("Para PNG/WebP, envie uma imagem de até 8 megapixels ou converta para JPG.")
                 # Reduz JPEG no decoder antes de EXIF/convert: evita materializar 50 MP em RAM.
                 image.draft("RGB", (MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
