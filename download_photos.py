@@ -48,8 +48,10 @@ def main():
                     raise RuntimeError("O acervo excede 10 GiB, limite definido para o build gratuito.")
                 from PIL import Image
                 with Image.open(temporary) as image:
-                    if image.format != "JPEG":
-                        raise ValueError("Conteúdo recebido não é JPEG.")
+                    if image.format not in {"JPEG", "MPO"}:
+                        raise ValueError(f"Conteúdo recebido não é JPEG: {image.format}.")
+                    if downloaded == 0:
+                        print(f"Formato detectado: {image.format}; tamanho: {image.size}", flush=True)
                     image.verify()
                 temporary.replace(destination)
                 total_bytes += destination.stat().st_size
@@ -58,6 +60,8 @@ def main():
                 errors += 1
                 temporary.unlink(missing_ok=True)
                 print(f"Falha em {entry.path}: {exc}", flush=True)
+                if errors >= 3 and downloaded == 0:
+                    raise RuntimeError("Três downloads falharam; interrompendo para diagnóstico.")
     except Exception as exc:
         errors += 1
         print(f"Não foi possível concluir o download: {exc}", flush=True)
