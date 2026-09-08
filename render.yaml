@@ -1,0 +1,33 @@
+# Render Free, sem disco pago. Fotos/índice/modelos são gerados no BUILD.
+services:
+  - type: web
+    name: encontre-suas-fotos
+    runtime: python
+    plan: free
+    region: virginia
+    numInstances: 1
+    autoDeployTrigger: off
+    # InsightFace declara opencv-python. Substitua por headless após resolver
+    # suas dependências; nunca mantenha as duas variantes de cv2 instaladas.
+    buildCommand: >-
+      python -m pip install -r requirements.txt &&
+      python -m pip uninstall -y opencv-python &&
+      python -m pip install opencv-python-headless==5.0.0.93 &&
+      python build_render.py
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.16
+      - key: MVP_REQUIRE_READY
+        value: "1"
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      - key: PYTHONUNBUFFERED
+        value: "1"
