@@ -1,0 +1,26 @@
+name: Validate MVP
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      MALLOC_ARENA_MAX: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install CPU dependencies without GUI libraries
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pip uninstall -y opencv-python
+          python -m pip install opencv-python-headless==5.0.0.93
+      - name: Unit and API tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: CPU inference and memory budget on Linux
+        run: python tests/benchmark_memory.py tests/fixtures/synthetic.jpg
