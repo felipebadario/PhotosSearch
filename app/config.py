@@ -26,6 +26,11 @@ MAX_PHOTOS_BYTES = 10 * 1024 ** 3  # Deixa margem no limite de 16 GB do build Re
 REQUIRE_READY = os.environ.get("MVP_REQUIRE_READY", "0") == "1"
 JPEG_EXTENSIONS = {".jpg", ".jpeg"}
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1ENMCFrad7A-oQKQQEKNylCsG6jU1H-6-"
+GOOGLE_DRIVE_FOLDER_ID = GOOGLE_DRIVE_FOLDER_URL.rstrip("/").rsplit("/", 1)[-1]
+# Credencial de uma Service Account (JSON completo, não o caminho de um arquivo),
+# com a pasta do Drive compartilhada com o e-mail dela como leitora. Autenticado:
+# sem o limite de "excesso de acessos" do download anônimo por link público.
+GOOGLE_SERVICE_ACCOUNT_JSON_ENV = "GOOGLE_SERVICE_ACCOUNT_JSON"
 
 
 def ensure_directories():

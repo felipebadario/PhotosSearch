@@ -125,16 +125,15 @@ class TestPreparation(unittest.TestCase):
     def test_parallel_download_respects_total_disk_budget(self):
         with scratch() as directory:
             root = Path(directory)
-            entries = [SimpleNamespace(id=str(i), path=f"{i}.JPG", local_path=str(root / f"{i}.JPG"))
-                       for i in range(8)]
+            entries = [SimpleNamespace(id=str(i), path=f"{i}.JPG") for i in range(8)]
             content = jpeg()
-            def download(**kwargs):
-                Path(kwargs["output"]).write_bytes(content)
-                return kwargs["output"]
+            def download(service, file_id, destination):
+                Path(destination).write_bytes(content)
             with patch.multiple(download_photos, PHOTOS_DIR=root, MAX_PHOTOS_BYTES=len(content) * 2), \
                     patch.object(download_photos, "photo_files", side_effect=lambda: list(root.glob("*.JPG"))), \
-                    patch("gdown.download_folder", return_value=entries), \
-                    patch("gdown.download", side_effect=download):
+                    patch.object(download_photos, "build_service", return_value=None), \
+                    patch.object(download_photos, "list_images", return_value=entries), \
+                    patch.object(download_photos, "download_file", side_effect=download):
                 self.assertEqual(download_photos.main(), 1)
             self.assertEqual(len(list(root.glob("*.JPG"))), 2)
             self.assertEqual(list(root.glob("*.part")), [])
@@ -238,7 +237,7 @@ class TestPreparation(unittest.TestCase):
                 self.assertEqual(client.post("/api/search").status_code, 503)
 
     def test_download_error_is_actionable(self):
-        with patch("gdown.download_folder", side_effect=ConnectionError("offline")):
+        with patch.object(download_photos, "build_service", side_effect=ConnectionError("offline")):
             self.assertEqual(download_photos.main(), 1)
 
 

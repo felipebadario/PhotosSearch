@@ -1,4 +1,11 @@
-"""Baixa JPG/JPEG recursivamente, sem OAuth. Arquivos existentes são preservados."""
+"""Baixa JPG/JPEG recursivamente via API do Google Drive (Service Account).
+
+Autenticado: cada arquivo é lido pelo ID, sem depender do link público
+anônimo nem do limite de "excesso de acessos" que ele impõe. A pasta do
+Drive precisa estar compartilhada com o e-mail da service account (leitora).
+Arquivos já baixados são preservados entre execuções.
+"""
+import json
 import os
 from collections import deque
 from pathlib import Path
@@ -6,42 +13,83 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
-from app.config import (GOOGLE_DRIVE_FOLDER_URL, PHOTOS_DIR, JPEG_EXTENSIONS,
-                        MAX_PHOTOS_BYTES, ensure_directories, photo_files)
+from app.config import (GOOGLE_DRIVE_FOLDER_ID, GOOGLE_SERVICE_ACCOUNT_JSON_ENV,
+                        PHOTOS_DIR, JPEG_EXTENSIONS, MAX_PHOTOS_BYTES,
+                        ensure_directories, photo_files)
+
+DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
+
+
+def build_service():
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    raw = os.environ.get(GOOGLE_SERVICE_ACCOUNT_JSON_ENV)
+    if not raw:
+        raise RuntimeError(f"Defina a variável {GOOGLE_SERVICE_ACCOUNT_JSON_ENV} com a "
+                           "credencial JSON da service account.")
+    info = json.loads(raw)
+    credentials = service_account.Credentials.from_service_account_info(
+        info, scopes=["https://www.googleapis.com/auth/drive.readonly"])
+    return build("drive", "v3", credentials=credentials, cache_discovery=False)
+
+
+def list_images(service, folder_id, prefix=""):
+    """Percorre a pasta e subpastas recursivamente; devolve [(id, caminho)]."""
+    images = []
+    page_token = None
+    while True:
+        response = service.files().list(
+            q=f"'{folder_id}' in parents and trashed = false",
+            fields="nextPageToken, files(id, name, mimeType)",
+            pageSize=1000, pageToken=page_token,
+            supportsAllDrives=True, includeItemsFromAllDrives=True,
+        ).execute()
+        for item in response.get("files", []):
+            relative = f"{prefix}{item['name']}"
+            if item["mimeType"] == DRIVE_FOLDER_MIME:
+                images.extend(list_images(service, item["id"], prefix=relative + "/"))
+            elif Path(item["name"]).suffix.lower() in JPEG_EXTENSIONS:
+                images.append(SimpleNamespace(id=item["id"], path=relative))
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            return images
+
+
+def download_file(service, file_id, destination):
+    from googleapiclient.http import MediaIoBaseDownload
+    request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
+    with open(destination, "wb") as handle:
+        downloader = MediaIoBaseDownload(handle, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
 
 
 def main():
     ensure_directories()
-    # Mantém o cache do gdown dentro do projeto, inclusive no Windows.
-    os.environ.setdefault("XDG_CACHE_HOME", str(PHOTOS_DIR.parent / "data" / "cache"))
-    import gdown
     downloaded = skipped = errors = 0
     total_bytes = sum(p.stat().st_size for p in photo_files())
     accounting = threading.Lock()
     stop = threading.Event()
     try:
-        entries = gdown.download_folder(
-            url=GOOGLE_DRIVE_FOLDER_URL, output=str(PHOTOS_DIR),
-            skip_download=True, quiet=True, use_cookies=False,
-        )
-        if not entries:
-            raise RuntimeError("A pasta não retornou arquivos; confira o link e as permissões.")
-        images = [e for e in entries if Path(e.path).suffix.lower() in JPEG_EXTENSIONS]
+        service = build_service()
+        images = list_images(service, GOOGLE_DRIVE_FOLDER_ID)
         print(f"JPG/JPEG encontrados no Drive: {len(images)}", flush=True)
         if not images:
             raise RuntimeError("Nenhum JPG/JPEG encontrado na pasta e subpastas.")
         retry_queue = []
-        # Detecta bloqueio sustentado do Drive (não só falha pontual de um arquivo):
-        # se as últimas tentativas foram todas negadas, insistir só desperdiça o
-        # orçamento de minutos do build gratuito, às vezes por horas.
+        # Falhas recentes em sequência sugerem um problema sistêmico (rede,
+        # credencial ou cota), não um arquivo isolado; insistir arquivo a
+        # arquivo só desperdiçaria o orçamento de minutos do build gratuito.
         recent = deque(maxlen=15)
         def download_one(item, is_retry=False):
             nonlocal downloaded, skipped, errors, total_bytes
             i, entry = item
             if stop.is_set():
                 return
-            destination = Path(entry.local_path).resolve()
+            destination = (PHOTOS_DIR / entry.path).resolve()
             if not destination.is_relative_to(PHOTOS_DIR.resolve()):
                 with accounting:
                     errors += 1
@@ -55,23 +103,21 @@ def main():
             temporary = destination.with_suffix(destination.suffix + ".part")
             print(f"Baixando {i}/{len(images)}: {entry.path}", flush=True)
             try:
-                # O Drive nega o arquivo quando o mesmo ID recebe muitos acessos em
-                # sequência (comum em builds seguidos); poucas tentativas com espera
-                # curta costumam liberar sem sobrecarregar o restante do acervo.
-                result = last_exc = None
+                last_exc = None
                 for attempt in range(3):
                     try:
-                        result = gdown.download(id=entry.id, output=str(temporary), quiet=True, use_cookies=False)
+                        download_file(service, entry.id, temporary)
                         last_exc = None
-                    except Exception as exc:
-                        result, last_exc = None, exc
-                    if result or stop.is_set():
                         break
+                    except Exception as exc:
+                        last_exc = exc
                     temporary.unlink(missing_ok=True)
+                    if stop.is_set():
+                        break
                     if attempt < 2:
                         time.sleep(3 * (attempt + 1))
-                if not result:
-                    raise last_exc or RuntimeError("O Google Drive não entregou o arquivo.")
+                if last_exc:
+                    raise last_exc
                 from PIL import Image
                 with Image.open(temporary) as image:
                     if image.format not in {"JPEG", "MPO"}:
@@ -93,31 +139,29 @@ def main():
                 with accounting:
                     recent.append(False)
                     if len(recent) == recent.maxlen and not any(recent):
-                        print("Últimas tentativas todas negadas: Drive parece ter bloqueado "
-                              "este IP por excesso de acessos. Parando em vez de insistir.", flush=True)
+                        print("Últimas tentativas todas negadas: parece um problema sistêmico "
+                              "(rede, credencial ou cota). Parando em vez de insistir.", flush=True)
                         stop.set()
                     if not is_retry and not stop.is_set():
-                        # Primeira falha após as tentativas curtas, sem parada
-                        # definitiva (limite de disco/rostos ou bloqueio sustentado):
-                        # adia para uma rodada final, depois que o restante do
-                        # acervo já tiver dado tempo do bloqueio pontual passar.
+                        # Falha isolada, sem parada definitiva (limite de disco ou
+                        # problema sistêmico): adia para uma rodada final, depois
+                        # que o resto do acervo já tiver dado tempo de uma falha
+                        # pontual (rede, timeout) se resolver sozinha.
                         retry_queue.append(item)
                     else:
                         errors += 1
                         if errors >= 3 and downloaded == 0:
                             stop.set()
-        # Apenas no preparo do acervo: duas streams de 512 KiB em disco. Um
-        # acervo de milhares de arquivos anônimos já é agressivo o bastante
-        # para o Drive; menos paralelismo reduz a chance de bloqueio por
-        # excesso de acessos. O servidor continua com um único worker e uma
+        # Autenticado pela API: sem o limite de acessos do download anônimo por
+        # link público. O servidor continua com um único worker e uma
         # inferência por vez.
-        with ThreadPoolExecutor(max_workers=2) as pool:
+        with ThreadPoolExecutor(max_workers=4) as pool:
             for _ in pool.map(download_one, enumerate(images, 1)):
                 pass
         if retry_queue and not stop.is_set():
-            print(f"Aguardando para tentar novamente {len(retry_queue)} arquivo(s) negados por excesso de acessos...", flush=True)
+            print(f"Tentando novamente {len(retry_queue)} arquivo(s) que falharam...", flush=True)
             time.sleep(20)
-            with ThreadPoolExecutor(max_workers=2) as pool:
+            with ThreadPoolExecutor(max_workers=4) as pool:
                 for _ in pool.map(lambda item: download_one(item, is_retry=True), retry_queue):
                     pass
     except Exception as exc:
@@ -127,7 +171,7 @@ def main():
     print(f"JPG/JPEG disponíveis em photos: {len(photo_files())}")
     if errors:
         print(f"Alternativa: baixe os álbuns manualmente e extraia os JPG/JPEG em {PHOTOS_DIR}.")
-        print("O Drive pode limitar listagens ou downloads. Nenhum OAuth é necessário.")
+        print("Confira se a pasta do Drive está compartilhada com o e-mail da service account.")
     return 1 if errors else 0
 
 

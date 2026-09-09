@@ -38,7 +38,7 @@ uvicorn app.main:app --reload
 
 Abra http://localhost:8000. Neste computador, há também o atalho `executar-local.ps1` com ações `download`, `index`, `serve` e `test`.
 
-O download usa https://drive.google.com/drive/folders/1ENMCFrad7A-oQKQQEKNylCsG6jU1H-6- e preserva subpastas. Se o Drive limitar o acesso, baixe manualmente os álbuns para `photos/` e indexe localmente. Neste ambiente, a conexão com o Drive foi interrompida; ainda não há acervo real baixado.
+O download usa a API do Google Drive autenticada por uma Service Account e preserva subpastas. Defina `GOOGLE_SERVICE_ACCOUNT_JSON` no ambiente com o conteúdo JSON da credencial (veja [PUBLICAR.md](PUBLICAR.md)) e compartilhe a pasta https://drive.google.com/drive/folders/1ENMCFrad7A-oQKQQEKNylCsG6jU1H-6- com o e-mail dela como leitora. Sem a variável definida, `download_photos.py` falha explicitamente em vez de tentar o link público anônimo.
 
 ## Configuração e privacidade
 

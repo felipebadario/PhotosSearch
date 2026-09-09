@@ -8,6 +8,18 @@ No painel Render, importe o repositório GitHub pelo Blueprint `render.yaml`. N�
 
 A conexão GitHub/Render deve permitir acesso somente ao repositório do MVP. As fotos, modelos e embeddings não devem ser enviados ao GitHub; `.gitignore` os exclui.
 
+## Credencial do Google Drive (Service Account)
+
+O download é autenticado pela API do Drive; não depende mais do link público anônimo nem do limite de "excesso de acessos" que ele impunha em acervos grandes.
+
+1. No [Google Cloud Console](https://console.cloud.google.com/), crie ou selecione um projeto e ative a **Google Drive API** (menu "APIs e serviços" → "Ativar APIs e serviços").
+2. Em "IAM e administrador" → "Contas de serviço", crie uma service account (qualquer nome; nenhum papel de projeto é necessário).
+3. Nessa conta, aba "Chaves" → "Adicionar chave" → "Criar nova chave" → JSON. Baixa um arquivo `.json`.
+4. Copie o campo `client_email` desse arquivo e compartilhe a pasta do Drive do acervo com esse e-mail, permissão de **leitor**.
+5. No painel do Render, no serviço, adicione uma variável de ambiente `GOOGLE_SERVICE_ACCOUNT_JSON` com o **conteúdo completo** do arquivo `.json` (não o caminho do arquivo). Marque como secreta; ela não faz parte do `render.yaml` e não deve ser commitada.
+
+Sem essa variável (ou com a pasta não compartilhada), `download_photos.py` falha explicitamente já no início do build, sem tentar nenhum fallback anônimo.
+
 ## Preparação no build
 
 O comando do Blueprint executa:
@@ -42,6 +54,6 @@ Antes de compartilhar: confirme o deploy, faça uma busca com selfie real e abra
 - O build tem orçamento de tempo, memória, disco e minutos mensais separado do runtime de 512 MB. Acervos acima de 10 GiB/20.000 rostos exigem rever o escopo. A indexação completa precisa caber no limite de execução do build.
 - Fotos originais consomem banda. O Free tem cotas mensais; não habilite pagamentos adicionais sem revisar os custos.
 - Picos de memória medidos no Windows não substituem medição no Linux. O workflow `.github/workflows/test.yml` testa CPU e memória no GitHub; valide também os gráficos/logs do Render.
-- O acesso ao Drive falhou neste ambiente. É necessário verificar se o build remoto consegue acessar o link; se não conseguir, não haverá busca pública funcional até corrigir a fonte das fotos.
+- O download anônimo por link público chegou a ser tentado e sofreu bloqueio por "excesso de acessos" do Drive em acervos de milhares de arquivos, mesmo a partir do IP de build do Render. A API autenticada por Service Account não depende desse limite de acesso anônimo.
 
 Referências: [Render Free](https://render.com/docs/free), [build pipeline](https://render.com/docs/build-pipeline), [FastAPI](https://render.com/docs/deploy-fastapi), [deploys](https://render.com/docs/deploys).
