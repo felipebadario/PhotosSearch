@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/*
+ * Tokens derivados da folha de estilo de produção do descomplica.church
+ * (--church-primary, --church-accent, --mint, --cream, --ink, --line, --green
+ * no CSS deles). df-accent é uma cor própria do Descomplica Fotos (âmbar,
+ * evoca luz/revelação de foto) para diferenciar do laranja-coral do Church
+ * mantendo o resto da família visual. Ver docs/architecture.md.
+ */
+@theme inline {
+  --color-df-primary: #153d33;
+  --color-df-primary-dark: #0e2b23;
+  --color-df-ink: #19342d;
+  --color-df-muted: #6b7a75;
+  --color-df-cream: #f7f5ef;
+  --color-df-white: #ffffff;
+  --color-df-line: #e2e0d8;
+  --color-df-mint: #a9d4c2;
+  --color-df-mint-soft: #eaf3ee;
+  --color-df-accent: #d98a3d;
+  --color-df-accent-dark: #b56f28;
+  --color-df-accent-soft: #f8ecd9;
+  --color-df-danger: #c1462f;
+  --color-df-danger-soft: #f8e6e1;
+
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-dm-sans), var(--font-manrope), ui-sans-serif, sans-serif;
+
+  --shadow-df-soft: 0 20px 45px -20px rgba(21, 61, 51, 0.18);
+  --shadow-df-card: 0 2px 10px -4px rgba(21, 61, 51, 0.08);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-df-mint);
+  color: var(--color-df-primary-dark);
+}

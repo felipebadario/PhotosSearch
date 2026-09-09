@@ -27,3 +27,18 @@ docs/                   Arquitetura, modelo de dados e contrato de rotas para v0
 **Mockado:** toda persistência (organizações, álbuns, fotos, buscas), upload real de arquivos, processamento assíncrono, importação do Google Drive (OAuth), autenticação.
 
 Ver `web/README.md` para o detalhamento tela a tela do que é real vs. mockado, e `docs/architecture.md` para o plano de infraestrutura da v0.2.
+
+## Próximos passos (v0.2)
+
+Em ordem de dependência (cada item destrava o seguinte):
+
+1. **Banco de dados real** — implementar `docs/data-model.md` em Postgres, trocar `lib/mock-data.ts` por queries. É o pré-requisito de tudo abaixo.
+2. **Object storage** — upload real de fotos (ex.: S3/R2), servindo originais e thumbnails por URL assinada em vez de `picsum.photos`.
+3. **Conectar o Face Search Service ao SaaS** — worker que consome `ProcessingJob`, chama a engine em `face-search-service/` por álbum (não mais um índice global por deploy — ver "Isolamento multi-tenant" em `docs/architecture.md`), grava `Face.embedding` com pgvector.
+4. **Fila de jobs** — mesmo que simples (fila em SQL), para o upload e a indexação sobreviverem a fechar a aba, o que o mock de v0.1 explicitamente não faz.
+5. **Autenticação** — login da organização; hoje ela é fixa (`mockOrganization`).
+6. **Importação real do Google Drive** — OAuth + Google Picker, substituindo a tela "em breve" do wizard.
+7. **Cobrança/assinatura** — ligar `Subscription`/`Product` a um provedor de pagamento real.
+8. **Integração com o ecossistema Descomplica** — usar o modelo `Organization → Subscription → Product` já pronto para o cenário de add-on do Church, sem mudança de schema.
+
+Fora de escopo até segunda ordem (ver o pedido original da v0.1): rede social, busca facial entre álbuns/organizações, editor de fotos, venda de fotos, app nativo, domínio personalizado, white-label avançado.
