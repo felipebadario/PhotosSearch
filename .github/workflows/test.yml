@@ -1,9 +1,12 @@
-name: Validate MVP
+name: Validate face-search-service
 on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: face-search-service
     env:
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
@@ -15,6 +18,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+          cache-dependency-path: face-search-service/requirements-dev.txt
       - name: Install CPU dependencies without GUI libraries
         run: |
           python -m pip install -r requirements-dev.txt
