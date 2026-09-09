@@ -35,6 +35,20 @@ def build_service():
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
 
+_thread_local = threading.local()
+
+
+def thread_service():
+    """Um cliente Drive por thread: o transporte HTTP da googleapiclient
+    (httplib2) não é thread-safe, e compartilhar uma única instância entre
+    downloads concorrentes corrompe a memória do processo (visto em
+    produção como "free(): corrupted unsorted chunks", que mata o build
+    inteiro sem nem passar por uma exceção Python)."""
+    if not hasattr(_thread_local, "service"):
+        _thread_local.service = build_service()
+    return _thread_local.service
+
+
 def list_images(service, folder_id, prefix="", stats=None):
     """Percorre a pasta e subpastas recursivamente; devolve [(id, caminho)].
 
@@ -114,7 +128,7 @@ def main():
                 last_exc = None
                 for attempt in range(3):
                     try:
-                        download_file(service, entry.id, temporary)
+                        download_file(thread_service(), entry.id, temporary)
                         last_exc = None
                         break
                     except Exception as exc:
