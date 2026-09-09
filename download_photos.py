@@ -35,8 +35,14 @@ def build_service():
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
 
-def list_images(service, folder_id, prefix=""):
-    """Percorre a pasta e subpastas recursivamente; devolve [(id, caminho)]."""
+def list_images(service, folder_id, prefix="", stats=None):
+    """Percorre a pasta e subpastas recursivamente; devolve [(id, caminho)].
+
+    `stats`, se passado, recebe contagens de diagnóstico (subpastas visitadas
+    e JPG/JPEG encontrados) sem alterar o retorno usado pelo download real.
+    """
+    if stats is not None:
+        stats["folders"] = stats.get("folders", 0) + 1
     images = []
     page_token = None
     while True:
@@ -49,9 +55,11 @@ def list_images(service, folder_id, prefix=""):
         for item in response.get("files", []):
             relative = f"{prefix}{item['name']}"
             if item["mimeType"] == DRIVE_FOLDER_MIME:
-                images.extend(list_images(service, item["id"], prefix=relative + "/"))
+                images.extend(list_images(service, item["id"], prefix=relative + "/", stats=stats))
             elif Path(item["name"]).suffix.lower() in JPEG_EXTENSIONS:
                 images.append(SimpleNamespace(id=item["id"], path=relative))
+                if stats is not None:
+                    stats["jpegs"] = stats.get("jpegs", 0) + 1
         page_token = response.get("nextPageToken")
         if not page_token:
             return images
