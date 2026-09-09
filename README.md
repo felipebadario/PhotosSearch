@@ -2,6 +2,8 @@
 
 MVP com FastAPI, InsightFace em CPU, NumPy e HTML/CSS/JavaScript puro. Sem banco, Docker, cadastro ou armazenamento de selfies.
 
+**No ar e validado:** https://encontre-suas-fotos.onrender.com — acervo completo (1106 fotos, 5144 rostos, 0 erros no build) e busca real confirmada na URL pública. Detalhes em [VALIDACAO.md](VALIDACAO.md).
+
 ## Publicação
 
 Veja [PUBLICAR.md](PUBLICAR.md). O `render.yaml` usa **plan: free**, um processo e nenhum disco pago. A publicação depende da conta GitHub/Render e de um build bem-sucedido com as fotos reais.

@@ -1,5 +1,7 @@
 # Publicar no Render Free a partir do GitHub
 
+**Já publicado e validado:** https://encontre-suas-fotos.onrender.com (1106 fotos, 5144 rostos, busca real confirmada — detalhes em [VALIDACAO.md](VALIDACAO.md)). O que segue documenta como chegar lá de novo (novo evento, novo acervo, ou um serviço novo).
+
 ## Configuração pronta
 
 Um único Web Service Python, `plan: free` (512 MB), CPU, sem Docker ou disco persistente. O provedor fornece a URL pública HTTPS. O computador local não participa do serviço.
@@ -19,6 +21,10 @@ O download é autenticado pela API do Drive; não depende mais do link público 
 5. No painel do Render, no serviço, adicione uma variável de ambiente `GOOGLE_SERVICE_ACCOUNT_JSON` com o **conteúdo completo** do arquivo `.json` (não o caminho do arquivo). Marque como secreta; ela não faz parte do `render.yaml` e não deve ser commitada.
 
 Sem essa variável (ou com a pasta não compartilhada), `download_photos.py` falha explicitamente já no início do build, sem tentar nenhum fallback anônimo.
+
+A pasta pode ser pública sem pertencer à conta da service account (foi o caso do acervo de 1106 fotos validado): a API respeita a permissão "qualquer pessoa com o link pode ver" mesmo para service accounts, sem exigir o compartilhamento explícito do passo 4. Se o acesso ainda assim falhar, rode `python check_drive_access.py` (autentica, testa `files.get` no folder ID e lista recursivamente, sem baixar nada) para isolar exatamente onde: credencial ausente/errada, folder ID errado, ou permissão insuficiente.
+
+Downloads rodam em paralelo (`ThreadPoolExecutor`); o cliente da API (`googleapiclient`, transporte `httplib2`) não é thread-safe, então `download_photos.py` cria um cliente por thread (`thread_service()`) em vez de reusar um único objeto. Compartilhar um único cliente entre threads chegou a corromper a memória do processo (`free(): corrupted unsorted chunks`) e derrubar o build inteiro sem nenhuma exceção Python — não reverta essa parte achando que é sobra de refatoração.
 
 ## Preparação no build
 
@@ -45,7 +51,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
 
 O Blueprint define threads em 1 e `MVP_REQUIRE_READY=1`. A aplicação carrega o índice e os dois modelos uma vez. `/api/health` retorna `ready: true` quando a busca está pronta; a câmera só fica habilitada nesse estado.
 
-Antes de compartilhar: confirme o deploy, faça uma busca com selfie real e abra a URL HTTPS pelo celular em 4G/5G. A captura frontal depende do navegador; HEIC deve ser convertido para JPG.
+Antes de compartilhar: confirme o deploy, faça uma busca com selfie real e abra a URL HTTPS pelo celular em 4G/5G. A captura frontal depende do navegador; HEIC deve ser convertido para JPG. (No deploy validado, a busca real foi feita com uma foto do próprio acervo, baixada pela URL pública e reenviada como selfie — ver VALIDACAO.md.)
 
 ## Limitações consideradas
 
@@ -54,6 +60,6 @@ Antes de compartilhar: confirme o deploy, faça uma busca com selfie real e abra
 - O build tem orçamento de tempo, memória, disco e minutos mensais separado do runtime de 512 MB. Acervos acima de 10 GiB/20.000 rostos exigem rever o escopo. A indexação completa precisa caber no limite de execução do build.
 - Fotos originais consomem banda. O Free tem cotas mensais; não habilite pagamentos adicionais sem revisar os custos.
 - Picos de memória medidos no Windows não substituem medição no Linux. O workflow `.github/workflows/test.yml` testa CPU e memória no GitHub; valide também os gráficos/logs do Render.
-- O download anônimo por link público chegou a ser tentado e sofreu bloqueio por "excesso de acessos" do Drive em acervos de milhares de arquivos, mesmo a partir do IP de build do Render. A API autenticada por Service Account não depende desse limite de acesso anônimo.
+- O download anônimo por link público chegou a ser tentado e sofreu bloqueio por "excesso de acessos" do Drive em acervos de milhares de arquivos, mesmo a partir do IP de build do Render. A API autenticada por Service Account não depende desse limite de acesso anônimo, e foi o que efetivamente completou o download de 1106 fotos sem erros no deploy validado.
 
 Referências: [Render Free](https://render.com/docs/free), [build pipeline](https://render.com/docs/build-pipeline), [FastAPI](https://render.com/docs/deploy-fastapi), [deploys](https://render.com/docs/deploys).
