@@ -1,45 +1,39 @@
 # NossaFoto
 
-Encontre a foto que você procura, mesmo entre milhares.
+Transformamos grandes acervos de fotografias em experiências inteligentes: cada pessoa encontra suas fotos com uma simples selfie.
 
-NossaFoto é um app pessoal, vendido por assinatura, para guardar acervos grandes de fotos e encontrar qualquer imagem por rosto, por descrição ou por contexto. Domínio: [nossafoto.app](https://nossafoto.app).
+NossaFoto é um SaaS B2B/B2B2C, horizontal, para instituições que produzem muitas fotos: igrejas e comunidades, organizadores de eventos, escolas e universidades, fotógrafos profissionais e empresas. Domínio: [nossafoto.app](https://nossafoto.app).
+
+- **NossaFoto Business:** assinatura recorrente, cobrada pelo volume de fotos indexadas.
+- **NossaFoto Events:** contratação por evento, com período de disponibilidade.
+- **NossaFoto Admin:** painel da instituição.
+- **NossaFoto Search:** experiência do participante, por link ou QR Code, sem cadastro e sem pagar nada.
 
 ## Estrutura do repositório
 
 ```
-web/                    App NossaFoto (Next.js 16, Vercel). Fase 1: interface completa com dados de demonstração.
-face-search-service/    Engine de busca facial (FastAPI + InsightFace). MVP standalone, já publicado.
-docs/                   Arquitetura, modelo de dados e contrato de rotas.
+web/                    NossaFoto Admin e NossaFoto Search (Next.js 16, Vercel)
+face-search-service/    Engine facial (FastAPI + InsightFace). Hoje ainda o MVP standalone.
+docs/                   Arquitetura, modelo de dados, rotas e roadmap
 ```
 
-`web/` é o produto. `face-search-service/` é o motor interno que ele vai consumir (ver `docs/architecture.md`). Na Fase 1 os dois **não estão conectados em runtime**: a interface usa dados de demonstração em memória, estruturados como a próxima fase vai consumir de verdade.
+## Documentação
 
-## Por onde começar
-
-- App (telas, fluxos, dados de demonstração): [`web/README.md`](web/README.md)
-- Engine de busca facial: [`face-search-service/README.md`](face-search-service/README.md)
-- Arquitetura, modelo de dados e rotas: [`docs/architecture.md`](docs/architecture.md), [`docs/data-model.md`](docs/data-model.md), [`docs/api-routes.md`](docs/api-routes.md)
+- [Arquitetura](docs/architecture.md)
+- [Modelo de dados](docs/data-model.md)
+- [Rotas](docs/api-routes.md)
+- [Roadmap](docs/roadmap.md)
+- App: [`web/README.md`](web/README.md) · Engine: [`face-search-service/README.md`](face-search-service/README.md)
 
 ## Branches e deploy
 
-- `develop`: app NossaFoto. A Vercel publica a partir dela, com Root Directory `web`.
-- `main`: MVP facial original, publicado no Render. Não é alterada por este trabalho.
+- `main` é a branch principal. A Vercel publica a `main` em produção (nossafoto.app), com Root Directory `web`.
+- Todo trabalho acontece em branches de funcionalidade a partir da `main`, que ganham uma URL de preview automática na Vercel.
+- Uma mudança só chega à `main`, e portanto a nossafoto.app, por pull request aprovado e mesclado pelo responsável do produto.
+- `develop` está descontinuada.
+- O MVP facial no Render (`encontre-suas-fotos`) tem deploy automático desligado. Para um deploy manual, o Root Directory do serviço precisa ser `face-search-service`.
+- Credenciais ficam só nas variáveis de ambiente da Vercel, do Fly.io e do Neon, nunca no repositório.
 
-## Estado atual (Fase 1)
+## Estado atual
 
-**Real:** identidade visual e design system, todas as telas navegáveis (Início, Buscar, Meu Acervo, Fontes, Minha Conta, página pública de álbum), validação real de arquivos na importação, QR Code e link de compartilhamento, engine facial do MVP (publicada e validada).
-
-**Demonstração:** toda persistência (conta, álbuns, fotos, importações), envio real de arquivos, processamento, resultados da busca facial, autenticação.
-
-**Ainda não implementado (sinalizado na interface):** busca por descrição, busca contextual, Google Drive, assinaturas e cobrança.
-
-## Próximas fases
-
-1. ~~Identidade e interface com dados de demonstração~~ (Fase 1)
-2. **Fundação:** autenticação, Postgres (Neon) com o modelo de `docs/data-model.md`, armazenamento de fotos (Cloudflare R2).
-3. **Processamento:** fila de jobs em SQL e worker facial (Fly.io) chamando a engine de `face-search-service/`, gravando embeddings com pgvector.
-4. **Busca e compartilhamento reais:** busca facial no acervo da conta e na página pública do álbum.
-5. **Assinaturas:** planos e cobrança.
-6. **Novas fontes e buscas:** Google Drive, busca por descrição e contextual.
-
-Fora de escopo por enquanto: busca facial global ou na internet, apps nativos, sistema de organizações.
+A interface (Fase 1) está publicada com dados de demonstração em memória e ainda segue o direcionamento pessoal anterior. A engine facial está validada em produção como MVP. O que falta para a jornada B2B real está em [docs/roadmap.md](docs/roadmap.md).

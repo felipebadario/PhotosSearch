@@ -1,39 +1,35 @@
 # Rotas — NossaFoto
 
-Contrato que a Fase 2 implementa de verdade contra Postgres, R2 e a fila. Na Fase 1 o app chama funções equivalentes em `web/lib/api/*.ts` (leituras) e `web/lib/actions/*.ts` (mutações), que usam `web/lib/mock-data.ts`. As assinaturas e os formatos já seguem este contrato.
+Contrato alvo do P0. Hoje o app em `web/` usa funções equivalentes em `web/lib/api` (leituras) e `web/lib/actions` (mutações) sobre dados de demonstração.
 
-"Conta" abaixo é sempre a conta do usuário autenticado. Na Fase 1 não há autenticação, então ela é fixa.
+## NossaFoto Admin (autenticado, escopo: organização da sessão)
 
-## App (autenticado, escopo: conta)
-
-| Rota | Descrição | Fase 1 |
+| Rota | Descrição | Etapa |
 |---|---|---|
-| `GET /api/library` | Resumo do acervo (fotos, álbuns, fontes) | demo (`getLibrarySummary`) |
-| `GET /api/photos?album&source&period` | Fotos do acervo com filtros | demo (`listLibraryPhotos`) |
-| `GET /api/albums` | Álbuns da conta | demo (`listAlbums`) |
-| `GET /api/albums/:id` | Detalhe do álbum | demo (`getAlbum`) |
-| `GET /api/albums/:id/photos` | Fotos do álbum | demo (`listAlbumPhotos`) |
-| `PATCH /api/albums/:id` | Nome, data, descrição, precisão da busca | demo (`updateAlbumAction`) |
-| `POST /api/albums/:id/publish` | Cria o link público | demo (`publishAlbumAction`) |
-| `DELETE /api/albums/:id/publish` | Para de compartilhar | demo (`unpublishAlbumAction`) |
-| `POST /api/imports` | Inicia importação (destino, origem, quantidade) | demo (`startImportAction`) |
-| `POST /api/imports/:id/files` | Envio dos arquivos (multipart ou URL assinada do R2) | não implementado |
-| `GET /api/imports` | Histórico de importações | demo (`listImports`) |
-| `POST /api/search/face` | Foto de referência + escopo (acervo ou álbum) → fotos | demo (`searchByFaceAction`) |
-| `POST /api/search/description` | Texto → fotos | não implementado |
-| `GET /api/account` | Perfil, assinatura, consumo | demo |
-| `GET /api/sources/google-drive` | Status da conexão | não implementado |
+| `GET /api/dashboard` | Indicadores: indexadas, em processamento, franquia, álbuns, eventos, buscas, taxa de sucesso, erros | P0.5 |
+| `GET/POST /api/collections` | Lista e cria acervos (`permanent` ou `event`) | P0.2 |
+| `GET/PATCH/DELETE /api/collections/:id` | Detalhe, datas, visibilidade, download, retenção | P0.2 |
+| `GET/POST /api/collections/:id/albums` | Álbuns do acervo | P0.2 |
+| `POST /api/uploads` | Pede URLs assinadas do R2 para um lote (checa franquia) | P0.2 |
+| `POST /api/uploads/complete` | Registra as fotos enviadas e enfileira a indexação | P0.2 |
+| `GET /api/collections/:id/photos` | Fotos com status de processamento | P0.3 |
+| `DELETE /api/photos/:id` | Exclusão definitiva (libera franquia) | P0.2 |
+| `GET /api/jobs` | Estado da fila e erros | P0.3 |
+| `POST /api/collections/:id/share` | Gera ou revoga link e código | P0.4 |
+| `POST /api/privacy/face-removal` | Registra pedido de remoção de rosto | P0.5 |
+| `GET /api/billing` | Plano, consumo e limites | P0.2 (consumo), P1 (cobrança) |
+| `GET/POST /api/sources` | Integrações externas | P1 |
+| `GET/POST /api/members` | Membros e papéis | P0.1 |
 
-## Público (sem autenticação, escopo: um álbum compartilhado)
+## NossaFoto Search (público, escopo: um link)
 
-| Rota | Descrição | Fase 1 |
+| Rota | Descrição | Etapa |
 |---|---|---|
-| `GET /api/public/:handle/:albumSlug` | Metadados do álbum público | demo (`getPublicAlbum`) |
-| `POST /api/public/:handle/:albumSlug/search` | Selfie → fotos daquele álbum | demo (`searchPublicAlbumAction`) |
+| `GET /api/s/:orgSlug/:collectionSlug` | Metadados públicos: nome, capa, estado (aberto, encerrado), se pede código | P0.4 |
+| `POST /api/s/:orgSlug/:collectionSlug/search` | Selfie (multipart) + código quando exigido → fotos encontradas com URLs assinadas | P0.4 |
 
-Nas rotas de busca, o app chama a engine com `(account_id, album_id?, foto)`, recebe `photo_id` + similaridade, resolve para URLs assinadas e **descarta a foto e o embedding logo após responder**.
+Na busca, a rota chama o worker com a selfie, recebe o embedding, consulta o pgvector com `(organization_id, collection_ids)`, responde e descarta selfie e embedding. Só a contagem vai para `search_logs`.
 
-## Fora de escopo por enquanto
+## Fora do P0
 
-- Busca que cruze contas, busca global ou na internet.
-- Webhooks de cobrança (Fase 5).
+Webhooks de pagamento (P1), busca por descrição (P2), qualquer busca que cruze organizações (nunca).
