@@ -1,6 +1,6 @@
 # NossaFoto — Web
 
-App NossaFoto: acervo pessoal de fotos com busca por rosto, além da página pública de um álbum compartilhado. Next.js 16 (App Router) + TypeScript + Tailwind v4. Publicado na Vercel a partir da branch `develop` (Root Directory `web`).
+App NossaFoto: acervo pessoal de fotos com busca por rosto, além da página pública de um álbum compartilhado. Next.js 16 (App Router) + TypeScript + Tailwind v4. Publicado na Vercel a partir da branch `main` (Root Directory `web`). A interface ainda segue o direcionamento pessoal da Fase 1; a adaptação para NossaFoto Admin e NossaFoto Search está no [roadmap](../docs/roadmap.md).
 
 ## Rodando localmente
 
