@@ -22,3 +22,11 @@ export function importStatusLabel(status: ImportStatus): string {
     error: "Com erros",
   }[status];
 }
+
+export function roleLabel(role: string): string {
+  return ({ owner: "Dono", admin: "Administrador", member: "Editor" } as Record<string, string>)[role] ?? role;
+}
+
+export function collectionKindLabel(kind: "permanent" | "event"): string {
+  return kind === "permanent" ? "Acervo permanente" : "Evento";
+}
