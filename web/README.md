@@ -1,54 +1,54 @@
 # NossaFoto — Web
 
-App NossaFoto: acervo pessoal de fotos com busca por rosto, além da página pública de um álbum compartilhado. Next.js 16 (App Router) + TypeScript + Tailwind v4. Publicado na Vercel a partir da branch `main` (Root Directory `web`). A interface ainda segue o direcionamento pessoal da Fase 1; a adaptação para NossaFoto Admin e NossaFoto Search está no [roadmap](../docs/roadmap.md).
+NossaFoto Admin (painel das organizações) e, nas próximas etapas, NossaFoto Search (página do participante). Next.js 16 (App Router) + TypeScript + Tailwind v4, Postgres com Drizzle e autenticação com Better Auth. Publicado na Vercel a partir da `main` (Root Directory `web`).
 
 ## Rodando localmente
 
+Precisa de um Postgres 16 acessível.
+
 ```sh
+cp .env.example .env.local   # ajuste DATABASE_URL e BETTER_AUTH_SECRET
 npm install
+npm run db:migrate
 npm run dev
 ```
 
-Abre em `http://localhost:3000`.
+## Variáveis de ambiente
+
+| Variável | Onde | Para quê |
+|---|---|---|
+| `DATABASE_URL` | Vercel (criada pela integração com o Neon) e `.env.local` | Banco Postgres |
+| `BETTER_AUTH_SECRET` | Vercel (Production e Preview) e `.env.local` | Assina as sessões. Texto aleatório longo, diferente por ambiente |
+| `BETTER_AUTH_URL` | Opcional | URL pública. Sem ela, usa o domínio do deploy da Vercel |
+
+Nenhum valor real vai para o repositório.
+
+## Scripts
+
+- `npm run build`: aplica as migrações pendentes (se houver `DATABASE_URL`) e gera o build.
+- `npm run db:generate`: cria uma migração em `drizzle/` a partir de `lib/server/db/schema`.
+- `npm run db:migrate`: aplica as migrações.
+- `npm test`: testes de isolamento entre organizações (precisa de `DATABASE_URL`).
 
 ## Estrutura
 
 ```
-app/(app)/                      Área logada, dentro do AppShell (sidebar no desktop, barra inferior no mobile)
-  page.tsx                      Início
-  buscar/{rosto,descricao,filtros}
-  acervo/                       Todas as fotos, álbuns, importações, importar
-  fontes/                       Upload direto, dispositivo, Google Drive
-  conta/                        Perfil, assinatura, consumo, privacidade
-app/(public)/[handle]/[album]/  Página pública de um álbum compartilhado (busca por selfie)
-components/ui/                  Design system: Button, Card, Badge, Input, Field, ProgressBar, EmptyState, SectionTabs...
-components/brand/               Logo
-components/layout/              AppShell, Sidebar, MobileNav, MobileTopbar, nav-items
-components/photos/              PhotoGrid, PhotoLightbox, AlbumCard
-components/search/              SearchBar, FaceSearch, DescriptionSearch
-components/import/              ImportFlow, UploadFileList
-components/albums/              Ajustes, compartilhamento
-lib/types.ts                    Tipos do domínio (espelham ../docs/data-model.md)
-lib/mock-data.ts                Dados de demonstração em memória (uma conta, oito álbuns)
-lib/api/                        Leituras (hoje sobre o mock, no formato de ../docs/api-routes.md)
-lib/actions/                    Mutações e buscas como Server Actions
+app/page.tsx                    Página inicial (visitantes); quem está logado vai para o painel
+app/(auth)/                     Entrar, criar conta, criar organização, aceitar convite
+app/(app)/                      NossaFoto Admin: painel, acervos, integrações, assinatura, configurações
+app/api/auth/[...all]/          Rotas do Better Auth
+app/(public)/[handle]/[album]/  Prévia da página do participante, ainda com dados de demonstração
+lib/server/db/                  Cliente e schema (Drizzle). Migrações em drizzle/
+lib/server/auth.ts              Better Auth com o plugin de organizações
+lib/server/permissions.ts       Papéis: dono, administrador e editor
+lib/server/session.ts           requireAdmin(): sessão + organização ativa + papel
+lib/server/repos/               Acesso a dados; toda função exige o contexto da organização
+lib/actions/                    Server Actions das telas
+tests/                          Testes com node:test
 ```
 
-Componentes de cliente nunca importam `lib/mock-data.ts`: leem por `lib/api/*` (no servidor) e escrevem por `lib/actions/*`. Trocar o mock pelo banco real não exige mudar a interface.
+Toda leitura ou escrita de dados de cliente passa por `lib/server/repos`, que recebe o contexto da organização e sempre filtra por ela. O papel vem da tabela de membros, nunca do navegador.
 
-As rotas antigas (`/dashboard`, `/albums`, `/storage`, `/integrations`, `/settings`) redirecionam para as novas em `next.config.ts`.
+## O que ainda é demonstração
 
-## O que é real e o que é demonstração
-
-**Real:**
-- Todas as telas e fluxos funcionam de ponta a ponta. Importar, publicar e ajustar um álbum altera o estado do servidor e aparece nas outras telas (`revalidatePath`).
-- A importação valida os arquivos de verdade: aceita apenas imagens e recusa arquivos acima de 50 MB.
-- O QR Code e o link do álbum compartilhado são gerados de verdade (`qrcode`).
-
-**Demonstração:**
-- Não há banco: o estado fica em memória e é reiniciado a cada deploy.
-- Os arquivos importados não são guardados; o álbum registra apenas a quantidade recebida.
-- A busca por rosto não processa a imagem, que nem sai do navegador. Ela devolve um exemplo do acervo, marcado como "Demonstração" na tela.
-- Não há autenticação: a conta é fixa (`mockAccount`).
-
-**Ainda não implementado (a interface diz isso claramente):** busca por descrição, Google Drive, assinaturas.
+A página pública `/{handle}/{album}` e os componentes de busca e importação herdados da Fase 1 usam `lib/mock-data.ts`. Eles serão ligados ao banco nas etapas P0.2 a P0.4 (ver `../docs/roadmap.md`).

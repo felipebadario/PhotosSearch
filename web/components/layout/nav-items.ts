@@ -1,4 +1,4 @@
-import { FolderOpen, Home, Search, UserRound, UploadCloud } from "lucide-react";
+import { CreditCard, FolderOpen, LayoutDashboard, Plug, Settings } from "lucide-react";
 
 export interface NavChild {
   href: string;
@@ -10,65 +10,30 @@ export interface NavItem {
   label: string;
   /** Rótulo curto para a barra inferior do celular. */
   shortLabel: string;
-  icon: typeof Home;
+  icon: typeof LayoutDashboard;
   /** Prefixo de rota que marca o item como ativo. */
   match: string;
   children?: NavChild[];
 }
 
 export const navItems: NavItem[] = [
-  { href: "/", label: "Início", shortLabel: "Início", icon: Home, match: "/" },
+  { href: "/painel", label: "Painel", shortLabel: "Painel", icon: LayoutDashboard, match: "/painel" },
+  { href: "/acervos", label: "Acervos e eventos", shortLabel: "Acervos", icon: FolderOpen, match: "/acervos" },
+  { href: "/integracoes", label: "Integrações", shortLabel: "Fontes", icon: Plug, match: "/integracoes" },
+  { href: "/assinatura", label: "Assinatura", shortLabel: "Plano", icon: CreditCard, match: "/assinatura" },
   {
-    href: "/buscar/rosto",
-    label: "Buscar",
-    shortLabel: "Buscar",
-    icon: Search,
-    match: "/buscar",
+    href: "/configuracoes",
+    label: "Configurações",
+    shortLabel: "Ajustes",
+    icon: Settings,
+    match: "/configuracoes",
     children: [
-      { href: "/buscar/rosto", label: "Por rosto" },
-      { href: "/buscar/descricao", label: "Por descrição" },
-      { href: "/buscar/filtros", label: "Filtros" },
-    ],
-  },
-  {
-    href: "/acervo",
-    label: "Meu Acervo",
-    shortLabel: "Acervo",
-    icon: FolderOpen,
-    match: "/acervo",
-    children: [
-      { href: "/acervo", label: "Todas as fotos" },
-      { href: "/acervo/albuns", label: "Álbuns" },
-      { href: "/acervo/importacoes", label: "Importações" },
-    ],
-  },
-  {
-    href: "/fontes",
-    label: "Fontes",
-    shortLabel: "Fontes",
-    icon: UploadCloud,
-    match: "/fontes",
-    children: [
-      { href: "/fontes#upload", label: "Upload direto" },
-      { href: "/fontes#google-drive", label: "Google Drive" },
-      { href: "/fontes#dispositivo", label: "Dispositivo" },
-    ],
-  },
-  {
-    href: "/conta",
-    label: "Minha Conta",
-    shortLabel: "Conta",
-    icon: UserRound,
-    match: "/conta",
-    children: [
-      { href: "/conta", label: "Perfil" },
-      { href: "/conta/assinatura", label: "Assinatura" },
-      { href: "/conta/consumo", label: "Consumo" },
-      { href: "/conta/privacidade", label: "Privacidade" },
+      { href: "/configuracoes", label: "Organização" },
+      { href: "/configuracoes/membros", label: "Membros" },
     ],
   },
 ];
 
 export function isActive(item: NavItem, pathname: string) {
-  return item.match === "/" ? pathname === "/" : pathname.startsWith(item.match);
+  return pathname === item.match || pathname.startsWith(`${item.match}/`);
 }
