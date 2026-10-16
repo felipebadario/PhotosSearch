@@ -1,63 +1,45 @@
-# Encontre suas fotos — Render Free
+# NossaFoto
 
-MVP com FastAPI, InsightFace em CPU, NumPy e HTML/CSS/JavaScript puro. Sem banco, Docker, cadastro ou armazenamento de selfies.
+Encontre a foto que você procura, mesmo entre milhares.
 
-**No ar e validado:** https://encontre-suas-fotos.onrender.com — acervo completo (1106 fotos, 5144 rostos, 0 erros no build) e busca real confirmada na URL pública. Detalhes em [VALIDACAO.md](VALIDACAO.md).
+NossaFoto é um app pessoal, vendido por assinatura, para guardar acervos grandes de fotos e encontrar qualquer imagem por rosto, por descrição ou por contexto. Domínio: [nossafoto.app](https://nossafoto.app).
 
-## Publicação
+## Estrutura do repositório
 
-Veja [PUBLICAR.md](PUBLICAR.md). O `render.yaml` usa **plan: free**, um processo e nenhum disco pago. A publicação depende da conta GitHub/Render e de um build bem-sucedido com as fotos reais.
-
-O build instala dependências, troca OpenCV pela variante headless, baixa os JPG/JPEG do Drive e gera `data/faces.pkl`. Fotos, modelos e índice ficam no diretório do aplicativo e compõem a versão publicada. Reinícios restauram essa versão; não há indexação por selfie nem escrita de dados persistentes em runtime. Para atualizar o evento, faça um novo deploy.
-
-## Memória
-
-- Modelo `buffalo_sc` (SCRFD 500M + MobileFaceNet), exclusivamente CPU. Embeddings antigos de `buffalo_l` precisam ser recriados.
-- ONNX Runtime com uma thread, execução sequencial, arena de CPU e memory pattern desativados; somente dois modelos carregados.
-- Selfie: detector 640 px. Indexação: 640 e 1024 px. Imagem de trabalho até 1280 px, com redução JPEG no decoder antes da correção EXIF.
-- Upload até 8 MB; JPEG até 50 MP, PNG/WebP até 8 MP. Sem spool de arquivos em disco.
-- Até 20.000 rostos (~39 MiB de matriz float32) e 10 GiB de fotos, com falha explícita se ultrapassar os limites. O limite de fotos reserva margem no build gratuito.
-- Uma busca por vez; consultas concorrentes recebem HTTP 429 para tentar novamente. Fotos originais são servidas sob demanda.
-
-O benchmark local mediu picos de 214–220 MiB, incluindo imports do servidor, modelo, 20.000 embeddings e uploads de 8 MiB. Isso não garante o consumo no Linux/Render; o workflow GitHub inclui medição no Linux, e o deploy precisa ser validado no provedor.
-
-## Executar localmente
-
-Com Python 3.11 de 64 bits, nesta pasta:
-
-```sh
-python -m venv .venv
+```
+web/                    App NossaFoto (Next.js 16, Vercel). Fase 1: interface completa com dados de demonstração.
+face-search-service/    Engine de busca facial (FastAPI + InsightFace). MVP standalone, já publicado.
+docs/                   Arquitetura, modelo de dados e contrato de rotas.
 ```
 
-Windows cmd: `.venv\Scripts\activate`. PowerShell: `.\.venv\Scripts\Activate.ps1`. macOS/Linux: `source .venv/bin/activate`.
+`web/` é o produto. `face-search-service/` é o motor interno que ele vai consumir (ver `docs/architecture.md`). Na Fase 1 os dois **não estão conectados em runtime**: a interface usa dados de demonstração em memória, estruturados como a próxima fase vai consumir de verdade.
 
-```sh
-python -m pip install -r requirements.txt
-python download_photos.py
-python index_photos.py
-uvicorn app.main:app --reload
-```
+## Por onde começar
 
-Abra http://localhost:8000. Neste computador, há também o atalho `executar-local.ps1` com ações `download`, `index`, `serve` e `test`.
+- App (telas, fluxos, dados de demonstração): [`web/README.md`](web/README.md)
+- Engine de busca facial: [`face-search-service/README.md`](face-search-service/README.md)
+- Arquitetura, modelo de dados e rotas: [`docs/architecture.md`](docs/architecture.md), [`docs/data-model.md`](docs/data-model.md), [`docs/api-routes.md`](docs/api-routes.md)
 
-O download usa a API do Google Drive autenticada por uma Service Account e preserva subpastas. Defina `GOOGLE_SERVICE_ACCOUNT_JSON` no ambiente com o conteúdo JSON da credencial (veja [PUBLICAR.md](PUBLICAR.md)) e compartilhe a pasta https://drive.google.com/drive/folders/1ENMCFrad7A-oQKQQEKNylCsG6jU1H-6- com o e-mail dela como leitora. Sem a variável definida, `download_photos.py` falha explicitamente em vez de tentar o link público anônimo.
+## Branches e deploy
 
-## Configuração e privacidade
+- `develop`: app NossaFoto. A Vercel publica a partir dela, com Root Directory `web`.
+- `main`: MVP facial original, publicado no Render. Não é alterada por este trabalho.
 
-Altere `MATCH_THRESHOLD = 0.45` em `app/config.py` e reinicie/republique. Calibre com pares positivos e negativos do evento. Similaridade não é probabilidade; o modelo menor pode perder precisão, especialmente em fotos difíceis. Não misture modelos no mesmo índice.
+## Estado atual (Fase 1)
 
-`photos/` e `data/` são criados automaticamente relativos ao projeto. `MVP_STORAGE_DIR` pode alterar a raiz em outra hospedagem; no Render Free deixe essa variável ausente. `MVP_REQUIRE_READY=1` impede iniciar a versão pública sem índice/modelo utilizável.
+**Real:** identidade visual e design system, todas as telas navegáveis (Início, Buscar, Meu Acervo, Fontes, Minha Conta, página pública de álbum), validação real de arquivos na importação, QR Code e link de compartilhamento, engine facial do MVP (publicada e validada).
 
-A selfie e seu embedding existem somente durante a requisição, sem logs de conteúdo. O índice contém embeddings do acervo consentido e não é servido por nenhuma rota. Carregue apenas o pickle gerado pelo projeto. Sem login, quem alcançar a URL poderá abrir as fotos.
+**Demonstração:** toda persistência (conta, álbuns, fotos, importações), envio real de arquivos, processamento, resultados da busca facial, autenticação.
 
-O [InsightFace](https://pypi.org/project/insightface/) tem código MIT, mas os modelos fornecidos são limitados a pesquisa não comercial; use um modelo licenciado se o uso não estiver coberto.
+**Ainda não implementado (sinalizado na interface):** busca por descrição, busca contextual, Google Drive, assinaturas e cobrança.
 
-## Testes
+## Próximas fases
 
-```sh
-python -m pip install -r requirements-dev.txt
-python -m unittest discover -s tests -p 'test_*.py' -v
-python tests/benchmark_memory.py tests/fixtures/synthetic.jpg
-```
+1. ~~Identidade e interface com dados de demonstração~~ (Fase 1)
+2. **Fundação:** autenticação, Postgres (Neon) com o modelo de `docs/data-model.md`, armazenamento de fotos (Cloudflare R2).
+3. **Processamento:** fila de jobs em SQL e worker facial (Fly.io) chamando a engine de `face-search-service/`, gravando embeddings com pgvector.
+4. **Busca e compartilhamento reais:** busca facial no acervo da conta e na página pública do álbum.
+5. **Assinaturas:** planos e cobrança.
+6. **Novas fontes e buscas:** Google Drive, busca por descrição e contextual.
 
-A imagem em `tests/fixtures` é inteiramente fictícia e usada só para testes. Não entra em `photos/`. O benchmark cria os embeddings de teste em RAM. Detalhes de execução estão em [VALIDACAO.md](VALIDACAO.md).
+Fora de escopo por enquanto: busca facial global ou na internet, apps nativos, sistema de organizações.

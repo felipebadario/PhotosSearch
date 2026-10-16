@@ -1,10 +1,14 @@
 # Render Free, sem disco pago. Fotos/índice/modelos são gerados no BUILD.
+# Este serviço é o Face Search Service: engine interna consumida pelo SaaS
+# (web/), não o produto em si. Vive em face-search-service/ desde que o
+# Descomplica Fotos passou a ser um monorepo (ver docs/architecture.md).
 services:
   - type: web
     name: encontre-suas-fotos
     runtime: python
     plan: free
     region: virginia
+    rootDir: face-search-service
     numInstances: 1
     autoDeployTrigger: off
     # InsightFace declara opencv-python. Substitua por headless após resolver
