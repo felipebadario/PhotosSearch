@@ -1,14 +1,16 @@
-import { Camera } from "lucide-react";
+import Link from "next/link";
+import { Logo } from "@/components/brand/Logo";
+import { Avatar } from "@/components/ui/Avatar";
 
-export function MobileTopbar() {
+export function MobileTopbar({ userName }: { userName: string }) {
   return (
-    <header className="flex items-center gap-2 border-b border-df-line bg-df-white px-4 py-3.5 md:hidden">
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-df-primary text-df-white">
-        <Camera size={15} strokeWidth={2.3} />
-      </span>
-      <span className="font-display text-sm font-bold text-df-ink">
-        Descomplica <span className="text-df-accent-dark">Fotos</span>
-      </span>
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-nf-line bg-nf-canvas/90 px-4 backdrop-blur-md md:hidden">
+      <Link href="/" aria-label="NossaFoto, início" className="rounded-nf">
+        <Logo size={26} />
+      </Link>
+      <Link href="/conta" aria-label="Minha conta" className="rounded-full">
+        <Avatar name={userName} size={32} />
+      </Link>
     </header>
   );
 }

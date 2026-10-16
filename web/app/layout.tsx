@@ -1,32 +1,38 @@
-import type { Metadata } from "next";
-import { Manrope, DM_Sans } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Geist } from "next/font/google";
 import "./globals.css";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["500", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Descomplica Fotos",
+  metadataBase: new URL("https://nossafoto.app"),
+  title: {
+    default: "NossaFoto — encontre a foto que você procura",
+    template: "%s · NossaFoto",
+  },
   description:
-    "Sua igreja publica os álbuns, cada participante encontra as próprias fotos com uma selfie.",
+    "Busca inteligente em grandes acervos de fotos. Encontre a foto que você procura, mesmo entre milhares.",
+  applicationName: "NossaFoto",
+  openGraph: {
+    title: "NossaFoto",
+    description: "Encontre a foto que você procura, mesmo entre milhares.",
+    siteName: "NossaFoto",
+    locale: "pt_BR",
+    type: "website",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#f7f7f5",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="pt-BR"
-      className={`${manrope.variable} ${dmSans.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-df-cream text-df-ink font-sans">
+    <html lang="pt-BR" className={`${geist.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-nf-canvas text-nf-text font-sans">
         {children}
       </body>
     </html>

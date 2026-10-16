@@ -1,38 +1,64 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import type { AlbumStatus } from "@/lib/types";
+import { statusLabel } from "@/lib/labels";
 
-const statusStyles: Record<AlbumStatus, string> = {
-  published: "bg-df-mint-soft text-df-primary-dark",
-  processing: "bg-df-accent-soft text-df-accent-dark",
-  draft: "bg-df-line/60 text-df-muted",
-  error: "bg-df-danger-soft text-df-danger",
+type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
+
+const tones: Record<Tone, string> = {
+  neutral: "bg-nf-sunken text-nf-muted",
+  accent: "bg-nf-accent-soft text-nf-accent-ink",
+  success: "bg-nf-success-soft text-nf-success",
+  warning: "bg-nf-warning-soft text-nf-warning",
+  danger: "bg-nf-danger-soft text-nf-danger",
 };
 
-const statusLabels: Record<AlbumStatus, string> = {
-  published: "Publicado",
-  processing: "Processando",
-  draft: "Rascunho",
-  error: "Erro",
-};
-
-export function StatusBadge({ status }: { status: AlbumStatus }) {
+export function Badge({
+  tone = "neutral",
+  dot,
+  pulse,
+  children,
+  className,
+}: {
+  tone?: Tone;
+  dot?: boolean;
+  pulse?: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
-        statusStyles[status],
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+        tones[tone],
+        className,
       )}
     >
-      <span
-        className={cn(
-          "h-1.5 w-1.5 rounded-full",
-          status === "published" && "bg-df-primary",
-          status === "processing" && "bg-df-accent animate-pulse",
-          status === "draft" && "bg-df-muted",
-          status === "error" && "bg-df-danger",
-        )}
-      />
-      {statusLabels[status]}
+      {dot && (
+        <span className={cn("h-1.5 w-1.5 rounded-full bg-current", pulse && "animate-pulse")} />
+      )}
+      {children}
     </span>
+  );
+}
+
+const statusTone: Record<AlbumStatus, Tone> = {
+  draft: "neutral",
+  processing: "accent",
+  ready: "success",
+  published: "accent",
+  error: "danger",
+};
+
+export function StatusBadge({ status, className }: { status: AlbumStatus; className?: string }) {
+  return (
+    <Badge
+      tone={statusTone[status]}
+      dot
+      pulse={status === "processing"}
+      className={className}
+    >
+      {statusLabel(status)}
+    </Badge>
   );
 }

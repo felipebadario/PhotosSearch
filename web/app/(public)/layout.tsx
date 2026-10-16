@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
-export default function PublicLayout({ children }: { children: ReactNode }) {
-  return <div className="min-h-screen bg-df-cream">{children}</div>;
+export default function PublicLayout({ children }: { children: React.ReactNode }) {
+  return <div className="min-h-screen bg-nf-canvas">{children}</div>;
 }

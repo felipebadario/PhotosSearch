@@ -4,28 +4,16 @@ import { cn } from "@/lib/cn";
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn(
-        "rounded-2xl border border-df-line bg-df-white shadow-df-card",
-        className,
-      )}
+      className={cn("rounded-nf-lg border border-nf-line bg-nf-surface", className)}
       {...props}
     />
   );
-}
-
-export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-6 pt-6", className)} {...props} />;
 }
 
 export function CardBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-6 pb-6", className)} {...props} />;
+  return <div className={cn("p-5 sm:p-6", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return (
-    <h3
-      className={cn("font-display text-base font-bold text-df-ink", className)}
-      {...props}
-    />
-  );
+  return <h3 className={cn("text-base font-semibold text-nf-text", className)} {...props} />;
 }

@@ -1,6 +1,6 @@
-# Descomplica Fotos — Web (v0.1)
+# NossaFoto — Web
 
-SaaS: dashboard admin da igreja + página pública de busca por selfie. Next.js (App Router) + TypeScript + Tailwind v4.
+App NossaFoto: acervo pessoal de fotos com busca por rosto, além da página pública de um álbum compartilhado. Next.js 16 (App Router) + TypeScript + Tailwind v4. Publicado na Vercel a partir da branch `develop` (Root Directory `web`).
 
 ## Rodando localmente
 
@@ -9,38 +9,46 @@ npm install
 npm run dev
 ```
 
-Abre em `http://localhost:3000`, redireciona para `/dashboard`.
+Abre em `http://localhost:3000`.
 
 ## Estrutura
 
 ```
-app/(admin)/        Dashboard, Álbuns, Armazenamento, Integrações, Configurações — atrás do AdminShell (sidebar).
-app/(public)/[org]/[album]/   Página pública de busca por selfie — sem sidebar, mobile-first.
-components/ui/       Design system: Button, Card, Badge, Input, StatCard, ProgressBar, EmptyState, OrgMark.
-components/layout/   AdminShell, Sidebar, MobileNav (bottom tab bar no mobile), MobileTopbar.
-components/albums/   Wizard de criação de álbum, abas do álbum, lista de upload, QR/link de compartilhamento.
-components/public/   Fluxo de busca por selfie (SelfieSearch) e o lightbox de foto.
-lib/types.ts         Tipos do domínio (espelham docs/data-model.md na raiz do repo).
-lib/mock-data.ts     Dados mockados (uma organização, quatro álbuns em status diferentes).
-lib/api/             Leituras — hoje batem no mock, formato já é o contrato de docs/api-routes.md.
-lib/actions/         Mutações como Server Actions do Next.js (create/upload/publish/update de álbum).
+app/(app)/                      Área logada, dentro do AppShell (sidebar no desktop, barra inferior no mobile)
+  page.tsx                      Início
+  buscar/{rosto,descricao,filtros}
+  acervo/                       Todas as fotos, álbuns, importações, importar
+  fontes/                       Upload direto, dispositivo, Google Drive
+  conta/                        Perfil, assinatura, consumo, privacidade
+app/(public)/[handle]/[album]/  Página pública de um álbum compartilhado (busca por selfie)
+components/ui/                  Design system: Button, Card, Badge, Input, Field, ProgressBar, EmptyState, SectionTabs...
+components/brand/               Logo
+components/layout/              AppShell, Sidebar, MobileNav, MobileTopbar, nav-items
+components/photos/              PhotoGrid, PhotoLightbox, AlbumCard
+components/search/              SearchBar, FaceSearch, DescriptionSearch
+components/import/              ImportFlow, UploadFileList
+components/albums/              Ajustes, compartilhamento
+lib/types.ts                    Tipos do domínio (espelham ../docs/data-model.md)
+lib/mock-data.ts                Dados de demonstração em memória (uma conta, oito álbuns)
+lib/api/                        Leituras (hoje sobre o mock, no formato de ../docs/api-routes.md)
+lib/actions/                    Mutações e buscas como Server Actions
 ```
 
-## O que é real vs. mockado
+Componentes de cliente nunca importam `lib/mock-data.ts`: leem por `lib/api/*` (no servidor) e escrevem por `lib/actions/*`. Trocar o mock pelo banco real não exige mudar a interface.
+
+As rotas antigas (`/dashboard`, `/albums`, `/storage`, `/integrations`, `/settings`) redirecionam para as novas em `next.config.ts`.
+
+## O que é real e o que é demonstração
 
 **Real:**
-- Todas as telas e fluxos são navegáveis de ponta a ponta, sem nenhum dado "preso" — criar álbum, enviar fotos, publicar, ver compartilhamento (QR Code real, gerado por `qrcode`), tudo funciona.
-- As mutações (`lib/actions/albums.ts`) são Server Actions de verdade: escrevem no estado do servidor (`lib/mock-data.ts`) e usam `revalidatePath`, então navegar para `/albums` ou `/dashboard` depois de criar um álbum mostra o resultado — não é só uma ilusão local do componente que criou.
-- Design system com tokens extraídos da folha de estilo de produção do `descomplica.church` (ver `../docs/architecture.md`).
+- Todas as telas e fluxos funcionam de ponta a ponta. Importar, publicar e ajustar um álbum altera o estado do servidor e aparece nas outras telas (`revalidatePath`).
+- A importação valida os arquivos de verdade: aceita apenas imagens e recusa arquivos acima de 50 MB.
+- O QR Code e o link do álbum compartilhado são gerados de verdade (`qrcode`).
 
-**Mockado (o contrato que substitui isso está em `../docs/api-routes.md` e `../docs/data-model.md`):**
-- Não existe banco de dados — `lib/mock-data.ts` é um array em memória, reiniciado a cada `npm run dev`/deploy.
-- Upload de fotos não envia bytes de verdade; a barra de progresso do wizard é uma animação no client (ver comentário em `lib/actions/albums.ts`). Se a aba for fechada no meio do envio, o álbum fica com status "Processando" indefinidamente neste mock — não há worker de verdade para retomar.
-- "Rostos identificados" é um número calculado (`fotos × 4.2`), não uma detecção real. A engine de verdade já existe e funciona — ver `../face-search-service/` — só não está conectada ao SaaS ainda.
-- A busca pública por selfie não processa nenhuma imagem: devolve um subconjunto determinístico das fotos do álbum, com uma similaridade aleatória só para ordenar o resultado.
-- Importação do Google Drive é só a interface (`drive-soon` no wizard, card "Não conectado" em Integrações) — sem OAuth implementado.
-- Não há autenticação: a organização é fixa (`mockOrganization`).
+**Demonstração:**
+- Não há banco: o estado fica em memória e é reiniciado a cada deploy.
+- Os arquivos importados não são guardados; o álbum registra apenas a quantidade recebida.
+- A busca por rosto não processa a imagem, que nem sai do navegador. Ela devolve um exemplo do acervo, marcado como "Demonstração" na tela.
+- Não há autenticação: a conta é fixa (`mockAccount`).
 
-## Próximos passos (v0.2)
-
-Ver a seção "Próximos passos" no README raiz do repositório.
+**Ainda não implementado (a interface diz isso claramente):** busca por descrição, Google Drive, assinaturas.

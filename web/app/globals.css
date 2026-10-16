@@ -1,33 +1,71 @@
 @import "tailwindcss";
 
 /*
- * Tokens derivados da folha de estilo de produção do descomplica.church
- * (--church-primary, --church-accent, --mint, --cream, --ink, --line, --green
- * no CSS deles). df-accent é uma cor própria do Descomplica Fotos (âmbar,
- * evoca luz/revelação de foto) para diferenciar do laranja-coral do Church
- * mantendo o resto da família visual. Ver docs/architecture.md.
+ * Design system do NossaFoto.
+ *
+ * Princípio: a interface é neutra e silenciosa; as fotos são a cor da tela.
+ * - Ações principais em grafite (nf-ink), sem gradientes.
+ * - Uma única cor de destaque (nf-accent, índigo) reservada para momentos de
+ *   busca/IA, seleção e foco.
+ * - Bordas finas em vez de sombras; sombra só em camadas flutuantes.
+ * Ver docs/architecture.md (seção Design system).
  */
 @theme inline {
-  --color-df-primary: #153d33;
-  --color-df-primary-dark: #0e2b23;
-  --color-df-ink: #19342d;
-  --color-df-muted: #6b7a75;
-  --color-df-cream: #f7f5ef;
-  --color-df-white: #ffffff;
-  --color-df-line: #e2e0d8;
-  --color-df-mint: #a9d4c2;
-  --color-df-mint-soft: #eaf3ee;
-  --color-df-accent: #d98a3d;
-  --color-df-accent-dark: #b56f28;
-  --color-df-accent-soft: #f8ecd9;
-  --color-df-danger: #c1462f;
-  --color-df-danger-soft: #f8e6e1;
+  --color-nf-canvas: #f7f7f5;
+  --color-nf-surface: #ffffff;
+  --color-nf-sunken: #f1f1ee;
+  --color-nf-ink: #16171a;
+  --color-nf-ink-hover: #2b2d31;
+  --color-nf-text: #16171a;
+  --color-nf-muted: #5f636b;
+  --color-nf-subtle: #8b8f97;
+  --color-nf-line: #e6e6e2;
+  --color-nf-line-strong: #d4d4cf;
 
-  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-dm-sans), var(--font-manrope), ui-sans-serif, sans-serif;
+  --color-nf-accent: #4f46e5;
+  --color-nf-accent-hover: #4338ca;
+  --color-nf-accent-soft: #eeedfd;
+  --color-nf-accent-ink: #3730a3;
 
-  --shadow-df-soft: 0 20px 45px -20px rgba(21, 61, 51, 0.18);
-  --shadow-df-card: 0 2px 10px -4px rgba(21, 61, 51, 0.08);
+  --color-nf-success: #17834f;
+  --color-nf-success-soft: #e6f4ec;
+  --color-nf-warning: #a86308;
+  --color-nf-warning-soft: #fbf1e1;
+  --color-nf-danger: #c93a3a;
+  --color-nf-danger-soft: #fbe9e9;
+
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-nf-sm: 8px;
+  --radius-nf: 12px;
+  --radius-nf-lg: 16px;
+  --radius-nf-xl: 24px;
+
+  --shadow-nf-float: 0 12px 32px -12px rgba(22, 23, 26, 0.18), 0 2px 6px -2px rgba(22, 23, 26, 0.06);
+  --shadow-nf-focus: 0 0 0 4px rgba(79, 70, 229, 0.16);
+
+  --animate-nf-fade-in: nf-fade-in 220ms ease-out both;
+  --animate-nf-rise: nf-rise 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-nf-shimmer: nf-shimmer 1.4s ease-in-out infinite;
+  --animate-nf-pulse-ring: nf-pulse-ring 1.8s ease-out infinite;
+
+  @keyframes nf-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes nf-rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes nf-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+  @keyframes nf-pulse-ring {
+    0% { transform: scale(0.85); opacity: 0.55; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
 }
 
 html {
@@ -36,9 +74,40 @@ html {
 
 body {
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3 {
+  letter-spacing: -0.02em;
 }
 
 ::selection {
-  background: var(--color-df-mint);
-  color: var(--color-df-primary-dark);
+  background: var(--color-nf-accent-soft);
+  color: var(--color-nf-accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-nf-accent);
+  outline-offset: 2px;
+}
+
+.nf-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-nf-sunken) 25%,
+    #e9e9e5 37%,
+    var(--color-nf-sunken) 63%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-nf-shimmer);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

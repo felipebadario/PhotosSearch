@@ -1,5 +1,5 @@
 import { mockAlbums, mockPhotosForAlbum } from "@/lib/mock-data";
-import type { Album, AlbumStatus, Photo } from "@/lib/types";
+import type { Album, LibraryPhoto } from "@/lib/types";
 import { delay } from "./delay";
 
 const DIACRITICS_REGEX = new RegExp("[̀-ͯ]", "g");
@@ -15,29 +15,28 @@ export function slugify(name: string) {
 
 /** GET /api/albums */
 export async function listAlbums(): Promise<Album[]> {
-  await delay(200);
+  await delay(150);
   return [...mockAlbums].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+export async function listRecentAlbums(limit = 6): Promise<Album[]> {
+  const albums = await listAlbums();
+  // Na página inicial mostramos álbuns que já dá para abrir e buscar.
+  return albums
+    .filter((a) => a.photoCount > 0 && (a.status === "ready" || a.status === "published"))
+    .slice(0, limit);
 }
 
 /** GET /api/albums/:id */
 export async function getAlbum(id: string): Promise<Album | undefined> {
-  await delay(150);
+  await delay(100);
   return mockAlbums.find((a) => a.id === id);
 }
 
 /** GET /api/albums/:id/photos */
-export async function listAlbumPhotos(id: string): Promise<Photo[]> {
-  await delay(250);
+export async function listAlbumPhotos(id: string): Promise<LibraryPhoto[]> {
+  await delay(200);
   const album = mockAlbums.find((a) => a.id === id);
-  if (!album || album.photoCount === 0) return [];
-  return mockPhotosForAlbum(id, Math.min(album.photoCount, 30));
-}
-
-export function statusLabel(status: AlbumStatus): string {
-  return {
-    draft: "Rascunho",
-    processing: "Processando",
-    published: "Publicado",
-    error: "Erro",
-  }[status];
+  if (!album) return [];
+  return mockPhotosForAlbum(id, 30).map((p) => ({ ...p, albumName: album.name }));
 }

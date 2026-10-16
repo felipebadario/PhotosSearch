@@ -13,17 +13,17 @@ export function CopyLinkButton({ url }: { url: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
-      // Sem permissão de clipboard (ex.: contexto não seguro) — falha silenciosa.
+      // Sem permissão de área de transferência (ex.: contexto não seguro).
     }
   }
 
   return (
     <Button
       variant="secondary"
-      icon={copied ? <Check size={16} /> : <Copy size={16} />}
+      icon={copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
       onClick={handleCopy}
     >
-      {copied ? "Link copiado!" : "Copiar link"}
+      <span aria-live="polite">{copied ? "Link copiado" : "Copiar link"}</span>
     </Button>
   );
 }

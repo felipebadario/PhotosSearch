@@ -1,8 +1,8 @@
 # Face Search Service
 
-Engine de busca facial do **Descomplica Fotos** (ver `../README.md` e `../docs/architecture.md` para o produto como um todo). FastAPI, InsightFace em CPU, NumPy e HTML/CSS/JavaScript puro. Sem banco, Docker, cadastro ou armazenamento de selfies.
+Engine de busca facial do **NossaFoto** (ver `../README.md` e `../docs/architecture.md` para o produto como um todo). FastAPI, InsightFace em CPU, NumPy e HTML/CSS/JavaScript puro. Sem banco, Docker, cadastro ou armazenamento de selfies.
 
-Este serviço nasceu como o MVP standalone "Encontre suas fotos" e continua funcionando exatamente como antes — é o que o SaaS (`../web/`) vai consumir internamente para detectar rostos e buscar por selfie, hoje ainda por trás de dados mockados no front-end (ver `../docs/architecture.md`).
+Este serviço nasceu como o MVP standalone "Encontre suas fotos" e continua funcionando exatamente como antes — é o que o app (`../web/`) vai consumir internamente para detectar rostos e buscar por selfie, hoje ainda por trás de dados mockados no front-end (ver `../docs/architecture.md`).
 
 **No ar e validado (como MVP standalone):** https://encontre-suas-fotos.onrender.com — acervo completo (1106 fotos, 5144 rostos, 0 erros no build) e busca real confirmada na URL pública. Detalhes em [VALIDACAO.md](VALIDACAO.md).
 

@@ -11,10 +11,23 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatDate(iso: string | null): string {
-  if (!iso) return "Sem data definida";
+  if (!iso) return "Sem data";
   return new Date(iso).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "long",
     year: "numeric",
   });
+}
+
+export function formatShortDate(iso: string | null): string {
+  if (!iso) return "Sem data";
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export function plural(count: number, one: string, many: string): string {
+  return `${formatNumber(count)} ${count === 1 ? one : many}`;
 }

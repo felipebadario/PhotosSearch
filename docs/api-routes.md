@@ -1,41 +1,39 @@
-# Rotas — Descomplica Fotos
+# Rotas — NossaFoto
 
-Convenção de v0.1: as rotas abaixo existem como *contrato* (o que a v0.2 implementa de verdade contra Postgres/Storage/Queue). Em v0.1, o app em `web/` chama funções equivalentes em `web/lib/api/*.ts`, que hoje devolvem dados de `web/lib/mock-data.ts` — a assinatura e o formato de retorno já seguem este contrato para a troca por chamadas HTTP reais ser mecânica.
+Contrato que a Fase 2 implementa de verdade contra Postgres, R2 e a fila. Na Fase 1 o app chama funções equivalentes em `web/lib/api/*.ts` (leituras) e `web/lib/actions/*.ts` (mutações), que usam `web/lib/mock-data.ts`. As assinaturas e os formatos já seguem este contrato.
 
-`org` abaixo sempre significa "a organização do usuário autenticado" — em v0.1 não há autenticação real, então é fixada em uma organização mockada.
+"Conta" abaixo é sempre a conta do usuário autenticado. Na Fase 1 não há autenticação, então ela é fixa.
 
-## Admin (autenticado, escopo: organização)
+## App (autenticado, escopo: conta)
 
-| Rota | Descrição | Status em v0.1 |
+| Rota | Descrição | Fase 1 |
 |---|---|---|
-| `GET /api/dashboard` | Estatísticas do mês, álbuns recentes | mock (`getDashboardStats`) |
-| `GET /api/albums` | Lista álbuns da organização | mock (`listAlbums`) |
-| `POST /api/albums` | Cria álbum (nome, data, capa, descrição) | mock (`createAlbum`) |
-| `GET /api/albums/:id` | Detalhe do álbum (contadores, status, url pública) | mock (`getAlbum`) |
-| `PATCH /api/albums/:id` | Atualiza nome/data/capa/descrição/threshold | mock (`updateAlbum`) |
-| `POST /api/albums/:id/publish` | Publica o álbum (gera/ativa a URL pública) | mock (`publishAlbum`) |
-| `POST /api/albums/:id/photos` | Upload direto — multipart, cria `Photo` + `ProcessingJob` | mock (`uploadPhotos`, simula progresso) |
-| `POST /api/albums/:id/import/google-drive` | Importa fotos de uma pasta do Drive já conectado | **stub** — interface definida, sem OAuth real ainda |
-| `GET /api/albums/:id/photos` | Lista fotos do álbum com status de processamento | mock (`listAlbumPhotos`) |
-| `DELETE /api/albums/:id/photos/:photoId` | Remove uma foto | mock |
-| `GET /api/integrations/google-drive` | Status da conexão (conectado/desconectado) | mock — sempre "desconectado" |
-| `POST /api/integrations/google-drive/connect` | Inicia OAuth (redirect) | **stub** — placeholder de UI, sem fluxo real |
-| `GET /api/settings/organization` | Nome, slug, logo da organização | mock |
-| `PATCH /api/settings/organization` | Atualiza dados da organização | mock |
-| `GET /api/storage` | Uso de armazenamento (bytes usados, limite do plano) | mock |
+| `GET /api/library` | Resumo do acervo (fotos, álbuns, fontes) | demo (`getLibrarySummary`) |
+| `GET /api/photos?album&source&period` | Fotos do acervo com filtros | demo (`listLibraryPhotos`) |
+| `GET /api/albums` | Álbuns da conta | demo (`listAlbums`) |
+| `GET /api/albums/:id` | Detalhe do álbum | demo (`getAlbum`) |
+| `GET /api/albums/:id/photos` | Fotos do álbum | demo (`listAlbumPhotos`) |
+| `PATCH /api/albums/:id` | Nome, data, descrição, precisão da busca | demo (`updateAlbumAction`) |
+| `POST /api/albums/:id/publish` | Cria o link público | demo (`publishAlbumAction`) |
+| `DELETE /api/albums/:id/publish` | Para de compartilhar | demo (`unpublishAlbumAction`) |
+| `POST /api/imports` | Inicia importação (destino, origem, quantidade) | demo (`startImportAction`) |
+| `POST /api/imports/:id/files` | Envio dos arquivos (multipart ou URL assinada do R2) | não implementado |
+| `GET /api/imports` | Histórico de importações | demo (`listImports`) |
+| `POST /api/search/face` | Foto de referência + escopo (acervo ou álbum) → fotos | demo (`searchByFaceAction`) |
+| `POST /api/search/description` | Texto → fotos | não implementado |
+| `GET /api/account` | Perfil, assinatura, consumo | demo |
+| `GET /api/sources/google-drive` | Status da conexão | não implementado |
 
-## Público (sem autenticação, escopo: um álbum publicado)
+## Público (sem autenticação, escopo: um álbum compartilhado)
 
-| Rota | Descrição | Status em v0.1 |
+| Rota | Descrição | Fase 1 |
 |---|---|---|
-| `GET /api/public/:orgSlug/:albumSlug` | Metadados do álbum público (nome, logo, capa, contagem de fotos) | mock (`getPublicAlbum`) |
-| `POST /api/public/:orgSlug/:albumSlug/search` | Recebe a selfie (multipart), devolve as fotos com match | mock (`searchAlbumBySelfie` — simula latência e retorna um subconjunto determinístico do mock) |
+| `GET /api/public/:handle/:albumSlug` | Metadados do álbum público | demo (`getPublicAlbum`) |
+| `POST /api/public/:handle/:albumSlug/search` | Selfie → fotos daquele álbum | demo (`searchPublicAlbumAction`) |
 
-Em produção, `POST .../search` é o único ponto onde o SaaS chama o Face Search Service: recebe bytes da selfie, chama a engine com `(organization_id, album_id, selfie_bytes)`, recebe uma lista de `photo_id` + similaridade, resolve para URLs assinadas do object storage, **descarta a selfie e o embedding imediatamente após responder**, e grava uma linha em `album_searches` (métrica agregada, nunca a selfie).
+Nas rotas de busca, o app chama a engine com `(account_id, album_id?, foto)`, recebe `photo_id` + similaridade, resolve para URLs assinadas e **descarta a foto e o embedding logo após responder**.
 
-## Fora de escopo em v0.1 (mencionadas para não serem esquecidas na v0.2)
+## Fora de escopo por enquanto
 
-- Autenticação/sessão real (hoje: organização fixa, sem login).
-- Emissão/validação de QR Code no servidor (v0.1 gera o QR no client a partir da URL pública).
-- Webhooks de assinatura/billing.
-- Qualquer rota de busca que não seja escopada a um único álbum.
+- Busca que cruze contas, busca global ou na internet.
+- Webhooks de cobrança (Fase 5).

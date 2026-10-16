@@ -2,25 +2,25 @@ import Link from "next/link";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
-type Size = "md" | "sm";
+type Variant = "primary" | "secondary" | "ghost" | "accent" | "danger";
+type Size = "sm" | "md" | "lg";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap";
+  "inline-flex items-center justify-center gap-2 rounded-nf font-medium transition-[background-color,border-color,color,transform] duration-150 ease-out active:scale-[0.98] disabled:opacity-45 disabled:pointer-events-none whitespace-nowrap select-none";
 
 const variants: Record<Variant, string> = {
-  primary:
-    "bg-df-primary text-df-white hover:bg-df-primary-dark hover:-translate-y-0.5 hover:shadow-df-soft active:translate-y-0",
+  primary: "bg-nf-ink text-white hover:bg-nf-ink-hover",
   secondary:
-    "bg-df-white text-df-primary border border-df-line hover:border-df-primary/40 hover:-translate-y-0.5 hover:shadow-df-card active:translate-y-0",
-  ghost: "text-df-ink hover:bg-df-mint-soft",
-  danger:
-    "bg-df-danger text-df-white hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0",
+    "bg-nf-surface text-nf-text border border-nf-line hover:border-nf-line-strong hover:bg-nf-sunken/60",
+  ghost: "text-nf-text hover:bg-nf-sunken",
+  accent: "bg-nf-accent text-white hover:bg-nf-accent-hover",
+  danger: "bg-nf-surface text-nf-danger border border-nf-line hover:bg-nf-danger-soft",
 };
 
 const sizes: Record<Size, string> = {
-  md: "text-sm px-5 py-2.5",
-  sm: "text-xs px-3.5 py-2",
+  sm: "h-9 px-3.5 text-sm",
+  md: "h-11 px-4.5 text-sm",
+  lg: "h-13 px-6 text-base",
 };
 
 interface CommonProps {
@@ -34,7 +34,16 @@ interface CommonProps {
 type ButtonProps = CommonProps &
   ButtonHTMLAttributes<HTMLButtonElement> & { href?: undefined };
 
-type LinkButtonProps = CommonProps & { href: string; target?: string };
+type LinkButtonProps = CommonProps & {
+  href: string;
+  target?: string;
+  rel?: string;
+  "aria-label"?: string;
+};
+
+export function buttonClasses(variant: Variant = "primary", size: Size = "md", className?: string) {
+  return cn(base, variants[variant], sizes[size], className);
+}
 
 export function Button({
   variant = "primary",
@@ -44,12 +53,18 @@ export function Button({
   children,
   ...props
 }: ButtonProps | LinkButtonProps) {
-  const classes = cn(base, variants[variant], sizes[size], className);
+  const classes = buttonClasses(variant, size, className);
 
   if ("href" in props && props.href) {
-    const { href, target } = props;
+    const { href, target, rel, ...rest } = props;
     return (
-      <Link href={href} target={target} className={classes}>
+      <Link
+        href={href}
+        target={target}
+        rel={target === "_blank" ? (rel ?? "noopener noreferrer") : rel}
+        className={classes}
+        {...rest}
+      >
         {icon}
         {children}
       </Link>
@@ -57,7 +72,11 @@ export function Button({
   }
 
   return (
-    <button className={classes} {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}>
+    <button
+      type="button"
+      className={classes}
+      {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
+    >
       {icon}
       {children}
     </button>
