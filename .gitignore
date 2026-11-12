@@ -6,3 +6,6 @@ data/*
 !data/.gitkeep
 *.log
 tests/.scratch/
+
+# armazenamento local de fotos (desenvolvimento)
+/web/.storage

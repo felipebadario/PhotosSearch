@@ -62,3 +62,9 @@ export async function isMember(organizationId: string, userId: string) {
     .limit(1);
   return Boolean(row);
 }
+
+/** Para rotas de API: o contexto ou null, sem redirecionar. */
+export async function getTenant(): Promise<AdminContext | null> {
+  const ctx = await loadContext();
+  return typeof ctx === "string" ? null : ctx;
+}

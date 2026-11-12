@@ -219,7 +219,7 @@ create table audit_logs (
 
 ## Decisões
 
-- **Consumo da franquia** = `count(*) from photos where organization_id = $1 and status = 'indexed'`. O índice único por `(organization_id, content_hash)` garante que a mesma foto conte uma vez, mesmo em vários acervos.
+- **Consumo da franquia** (implementado na P0.2) = `count(*) from photos where organization_id = $1 and status <> 'error'`: conta toda foto guardada, inclusive as reservadas durante o envio (`uploading`) e as que aguardam indexação. Reservas abandonadas somem em 2 horas. O hash é guardado em hex (`text`). O índice único por `(organization_id, content_hash)` garante que a mesma foto conte uma vez, mesmo em vários acervos.
 - **Exclusão definitiva** apaga a linha de `photos` (cascata em `faces` e `collection_photos`) e o objeto no R2, liberando a franquia.
 - **Eventos com `event_passes`** contam contra o limite do pacote, não da assinatura.
 - **`slug` do acervo é único por organização**: a URL pública é `/{organization.slug}/{collection.slug}`.

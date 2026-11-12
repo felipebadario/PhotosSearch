@@ -10,7 +10,9 @@ import {
   ValidationError,
   type CollectionInput,
 } from "@/lib/server/repos/collections";
+import { collectionPhotoIds, deleteOrphanPhotos } from "@/lib/server/repos/photos";
 import { requireAdmin } from "@/lib/server/session";
+import { getStorage } from "@/lib/server/storage";
 import { ForbiddenError, NotFoundError } from "@/lib/server/tenant-types";
 
 export type CollectionFormState = { error?: string; values?: Record<string, string> };
@@ -73,7 +75,11 @@ export async function updateCollectionAction(_prev: CollectionFormState, form: F
 
 export async function deleteCollectionAction(form: FormData) {
   const ctx = await requireAdmin();
-  await deleteCollection(db, ctx, String(form.get("id") ?? ""));
+  const id = String(form.get("id") ?? "");
+  const photoIds = await collectionPhotoIds(db, ctx, id);
+  await deleteCollection(db, ctx, id);
+  const keys = await deleteOrphanPhotos(db, ctx, photoIds);
+  await getStorage()?.remove(keys).catch((err) => console.error("[storage] falha ao apagar originais", err));
   revalidatePath("/acervos");
   revalidatePath("/painel");
   redirect("/acervos");
