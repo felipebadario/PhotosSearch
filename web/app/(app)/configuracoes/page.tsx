@@ -1,3 +1,6 @@
+import { CoverForm } from "@/components/settings/CoverForm";
+import { getCover } from "@/lib/server/repos/covers";
+import { db } from "@/lib/server/db";
 import type { Metadata } from "next";
 import { Card } from "@/components/ui/Card";
 import { OrganizationForm } from "@/components/settings/OrganizationForm";
@@ -9,6 +12,8 @@ export const metadata: Metadata = { title: "Organização" };
 
 export default async function OrganizacaoPage() {
   const ctx = await requireAdmin();
+  const canUpdate = can(ctx.role, { organization: ["update"] });
+  const cover = canUpdate ? await getCover(db, ctx.organizationId, null) : null;
   return (
     <div className="grid max-w-2xl gap-6">
       <Card className="p-6">
@@ -16,9 +21,10 @@ export default async function OrganizacaoPage() {
         <OrganizationForm
           name={ctx.organization.name}
           slug={ctx.organization.slug}
-          disabled={!can(ctx.role, { organization: ["update"] })}
+          disabled={!canUpdate}
         />
       </Card>
+      {canUpdate && <CoverForm image={cover} />}
       <Card className="p-6">
         <h2 className="font-semibold text-nf-text">Sua conta</h2>
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-[120px_1fr]">

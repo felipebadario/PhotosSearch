@@ -1,3 +1,5 @@
+import { getCover } from "@/lib/server/repos/covers";
+import Image from "next/image";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -30,8 +32,11 @@ export default async function PublicCollectionPage({ params, searchParams }: Pag
   if (!c) notFound();
 
   const base = `/${c.organizationSlug}/${c.slug}`;
+  const eventCover = c.state === "open" && c.kind === "event" ? await getCover(db, c.organizationId, c.id) : null;
+  const cover = c.state === "open" ? eventCover ?? await getCover(db, c.organizationId, null) : null;
   const header = (
     <header className="flex flex-col items-center text-center">
+      {cover && <Image unoptimized src={cover} alt="" width={1440} height={480} className="mb-5 w-full rounded-nf" />}
       <Avatar name={c.organizationName} size={44} />
       <p className="mt-3 text-sm text-nf-muted">{c.organizationName}</p>
       <h1 className="mt-1 text-2xl font-semibold text-nf-text sm:text-3xl">{c.name}</h1>

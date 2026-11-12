@@ -5,6 +5,7 @@ import type { NextConfig } from "next";
  * para que links salvos continuem levando a um lugar útil.
  */
 const nextConfig: NextConfig = {
+  experimental: { serverActions: { bodySizeLimit: "4.25mb" } },
   async redirects() {
     const to = (source: string, destination: string) => ({ source, destination, permanent: false });
     return [
