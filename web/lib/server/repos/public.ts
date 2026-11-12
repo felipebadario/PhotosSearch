@@ -1,6 +1,6 @@
-import { and, asc, count, desc, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import type { Db } from "../db/index.ts";
-import { albums, auditLogs, collectionPhotos, collections, organization, photos, type Collection } from "../db/schema/index.ts";
+import { albums, auditLogs, collectionPhotos, collections, organization, photos, searchLogs, type Collection } from "../db/schema/index.ts";
 import { can } from "../permissions.ts";
 import { ForbiddenError, NotFoundError, type TenantContext } from "../tenant-types.ts";
 
@@ -19,6 +19,7 @@ export type PublicCollection = {
   description: string | null;
   kind: Collection["kind"];
   allowDownload: boolean;
+  matchThreshold: number;
   /** open: fotos visíveis. closed: evento passou do prazo de disponibilidade. */
   state: "open" | "closed";
 };
@@ -45,6 +46,7 @@ export async function getPublicCollection(db: Db, orgSlug: string, collectionSlu
     description: row.c.description,
     kind: row.c.kind,
     allowDownload: row.c.allowDownload,
+    matchThreshold: row.c.matchThreshold,
     state: closed ? "closed" : "open",
   };
 }
@@ -87,6 +89,42 @@ export async function listPublicPhotos(db: Db, c: PublicCollection, opts: { albu
     .where(and(...where))
     .orderBy(desc(collectionPhotos.addedAt), asc(photos.id))
     .limit(opts.limit ?? 120);
+}
+
+/** Fotos do acervo aberto, pelos ids que a busca devolveu. Ignora qualquer id que não seja deste acervo. */
+export async function getPublicPhotosByIds(db: Db, c: PublicCollection, ids: string[]) {
+  if (c.state !== "open" || ids.length === 0) return [];
+  return db
+    .select({ id: photos.id, albumName: albums.name, takenAt: photos.takenAt })
+    .from(collectionPhotos)
+    .innerJoin(photos, eq(photos.id, collectionPhotos.photoId))
+    .leftJoin(albums, eq(albums.id, collectionPhotos.albumId))
+    .where(and(visible(c), inArray(photos.id, ids)));
+}
+
+/** Fotos do acervo que já podem ser buscadas e as que ainda estão na fila. */
+export async function searchReadiness(db: Db, c: PublicCollection) {
+  const rows = await db
+    .select({ status: photos.status, n: count() })
+    .from(collectionPhotos)
+    .innerJoin(photos, eq(photos.id, collectionPhotos.photoId))
+    .where(and(eq(collectionPhotos.organizationId, c.organizationId), eq(collectionPhotos.collectionId, c.id)))
+    .groupBy(photos.status);
+  const n = (st: string) => rows.find((r) => r.status === st)?.n ?? 0;
+  return { searchable: n("indexed"), pending: n("queued") + n("processing") };
+}
+
+/** Métrica de uso: só a contagem de resultados. Nunca a selfie nem o vetor dela. */
+export async function logSearch(db: Db, c: PublicCollection, matchCount: number) {
+  await db.insert(searchLogs).values({ organizationId: c.organizationId, collectionId: c.id, matchCount });
+}
+
+export async function recentSearchCount(db: Db, c: PublicCollection, seconds: number) {
+  const [row] = await db
+    .select({ n: count() })
+    .from(searchLogs)
+    .where(and(eq(searchLogs.collectionId, c.id), gte(searchLogs.createdAt, sql`now() - make_interval(secs => ${seconds})`)));
+  return row?.n ?? 0;
 }
 
 /** A foto só sai se estiver neste acervo e ele estiver aberto. */

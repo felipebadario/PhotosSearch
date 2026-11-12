@@ -4,6 +4,7 @@ import { errorResponse, json, sameOrigin } from "@/lib/server/http";
 import { completeUploads } from "@/lib/server/repos/photos";
 import { getTenant } from "@/lib/server/session";
 import { getStorage } from "@/lib/server/storage";
+import { wakeWorker } from "@/lib/server/worker";
 
 /** Etapa 2 do envio: confirma que os arquivos chegaram e coloca as fotos no acervo. */
 export async function POST(req: Request) {
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
       },
       (key) => storage.head(key),
     );
+    if (result.done.length) await wakeWorker();
     revalidatePath(`/acervos/${collectionId}`);
     revalidatePath("/painel");
     return json(result);

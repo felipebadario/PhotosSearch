@@ -21,6 +21,7 @@ npm run dev
 | `BETTER_AUTH_SECRET` | Vercel (Production e Preview) e `.env.local` | Assina as sessões. Texto aleatório longo, diferente por ambiente |
 | `BETTER_AUTH_URL` | Opcional | URL pública. Sem ela, usa o domínio do deploy da Vercel |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Vercel (Production e Preview) | Bucket privado do Cloudflare R2 com os originais. Sem elas, a Vercel mostra o envio como "não ativo" e o desenvolvimento local grava em `./.storage` |
+| `WORKER_URL`, `WORKER_SECRET` | Vercel (Production e Preview) | Serviço de rostos no Fly.io (`worker/`). Sem elas, a busca por selfie não aparece na página pública |
 | `STORAGE_DRIVER=local`, `LOCAL_STORAGE_DIR` | Só local | Força o disco local mesmo com `next start` (testes de ponta a ponta) |
 
 Nenhum valor real vai para o repositório.
@@ -77,3 +78,7 @@ A página pública `/{handle}/{album}` e os componentes de busca e importação 
 ## Link público e QR Code
 
 Cada acervo começa privado. No Admin, "Abrir por link" muda a visibilidade para `link` e mostra o endereço `/{organização}/{acervo}` e o QR Code. A página pública (`app/(public)/[handle]/[album]`) mostra a galeria do acervo, por álbum, sem login; as fotos saem por `GET /api/publico/{organização}/{acervo}/fotos/{id}`, que confere a cada pedido que o acervo está aberto e que a foto é dele. Evento que passou de "aberto até" mostra "encerrado" e não entrega fotos. A busca por selfie entra nesta mesma página depois da indexação (P0.3/P0.4).
+
+## Busca por selfie
+
+Na página pública, a pessoa marca o consentimento, tira (ou escolhe) uma selfie, o navegador a reduz para 1280 px e envia para `POST /api/publico/{org}/{acervo}/buscar`. A rota só aceita acervo aberto por link, limita 10 buscas por minuto por IP e 120 por minuto por acervo, repassa a selfie ao serviço de rostos (que compara só com o acervo da URL) e devolve apenas fotos desse acervo. O registro guarda só a contagem de resultados.

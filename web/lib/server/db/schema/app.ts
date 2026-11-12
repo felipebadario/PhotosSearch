@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, index, integer, jsonb, pgEnum, pgTable, primaryKey, real, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, customType, index, integer, jsonb, pgEnum, pgTable, primaryKey, real, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 import { organization, user } from "./auth.ts";
 
 /**
@@ -113,6 +115,9 @@ export const photos = pgTable(
     modelVersion: text("model_version"),
     errorMessage: text("error_message"),
     indexedAt: timestamp("indexed_at", { withTimezone: true }),
+    faceCount: integer("face_count"),
+    attempts: integer("attempts").notNull().default(0),
+    processingStartedAt: timestamp("processing_started_at", { withTimezone: true }),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -136,6 +141,37 @@ export const collectionPhotos = pgTable(
     index("collection_photos_org_idx").on(t.organizationId, t.collectionId),
     index("collection_photos_photo_idx").on(t.photoId),
   ],
+);
+
+// ── Rostos e buscas ──
+
+/** Um rosto detectado numa foto. O embedding é o vetor de 512 float32 (little-endian) do modelo, já normalizado. */
+export const faces = pgTable(
+  "faces",
+  {
+    id: text("id").primaryKey().default(sql`gen_random_uuid()::text`),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    photoId: text("photo_id").notNull().references(() => photos.id, { onDelete: "cascade" }),
+    embedding: bytea("embedding").notNull(),
+    bbox: jsonb("bbox").notNull(),
+    detectionScore: real("detection_score"),
+    modelVersion: text("model_version").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("faces_photo_idx").on(t.photoId), index("faces_org_idx").on(t.organizationId)],
+);
+
+/** Métrica de uso da busca. Nunca guarda a selfie nem o embedding dela. */
+export const searchLogs = pgTable(
+  "search_logs",
+  {
+    id: text("id").primaryKey().default(sql`gen_random_uuid()::text`),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    collectionId: text("collection_id").references(() => collections.id, { onDelete: "set null" }),
+    matchCount: integer("match_count").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("search_logs_collection_time_idx").on(t.collectionId, t.createdAt)],
 );
 
 export type Collection = typeof collections.$inferSelect;
