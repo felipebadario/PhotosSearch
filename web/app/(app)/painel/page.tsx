@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/Card";
 import { db } from "@/lib/server/db";
 import { countCollections } from "@/lib/server/repos/collections";
 import { countMembers } from "@/lib/server/repos/members";
+import { getUsage } from "@/lib/server/repos/photos";
+import { UsageMeter } from "@/components/admin-photos/UsageMeter";
 import { requireAdmin } from "@/lib/server/session";
 import { word } from "@/lib/format";
 
@@ -13,7 +15,7 @@ export const metadata: Metadata = { title: "Painel" };
 
 export default async function PainelPage() {
   const ctx = await requireAdmin();
-  const [collections, members] = await Promise.all([countCollections(db, ctx), countMembers(db, ctx)]);
+  const [collections, members, usage] = await Promise.all([countCollections(db, ctx), countMembers(db, ctx), getUsage(db, ctx)]);
   const firstName = ctx.user.name.split(" ")[0];
 
   const stats = [
@@ -26,7 +28,7 @@ export default async function PainelPage() {
     { done: true, label: "Criar a conta da organização" },
     { done: collections.permanent + collections.event > 0, label: "Criar o primeiro acervo ou evento", href: "/acervos/novo" },
     { done: members > 1, label: "Convidar quem vai ajudar a cuidar das fotos", href: "/configuracoes/membros" },
-    { done: false, label: "Enviar fotos (chega na próxima etapa)" },
+    { done: usage.used > 0, label: "Enviar as primeiras fotos", href: "/acervos" },
   ];
 
   return (
@@ -63,9 +65,9 @@ export default async function PainelPage() {
             );
           })}
         </div>
-        <p className="mt-3 text-sm text-nf-muted">
-          Fotos indexadas, buscas e consumo da franquia aparecem aqui assim que o envio de fotos estiver disponível.
-        </p>
+        <Card className="mt-3 p-4 sm:p-5">
+          <UsageMeter used={usage.used} limit={usage.limit} planName={usage.name} showLink />
+        </Card>
       </section>
 
       <section aria-labelledby="primeiros-passos">

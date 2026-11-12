@@ -20,8 +20,29 @@ npm run dev
 | `DATABASE_URL` | Vercel (criada pela integração com o Neon) e `.env.local` | Banco Postgres |
 | `BETTER_AUTH_SECRET` | Vercel (Production e Preview) e `.env.local` | Assina as sessões. Texto aleatório longo, diferente por ambiente |
 | `BETTER_AUTH_URL` | Opcional | URL pública. Sem ela, usa o domínio do deploy da Vercel |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Vercel (Production e Preview) | Bucket privado do Cloudflare R2 com os originais. Sem elas, a Vercel mostra o envio como "não ativo" e o desenvolvimento local grava em `./.storage` |
+| `STORAGE_DRIVER=local`, `LOCAL_STORAGE_DIR` | Só local | Força o disco local mesmo com `next start` (testes de ponta a ponta) |
 
 Nenhum valor real vai para o repositório.
+
+### CORS do bucket R2
+
+O navegador envia as fotos direto para o R2, então o bucket precisa desta regra de CORS (Cloudflare → R2 → bucket → Settings → CORS policy):
+
+```json
+[{ "AllowedOrigins": ["https://nossafoto.app", "https://www.nossafoto.app", "http://localhost:3000"],
+   "AllowedMethods": ["PUT", "GET", "HEAD"],
+   "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"],
+   "MaxAgeSeconds": 3600 }]
+```
+
+## Envio de fotos
+
+1. O navegador calcula o SHA-256 de cada arquivo e chama `POST /api/uploads` em lotes de 100.
+2. O servidor deduplica pelo hash dentro da organização, checa o limite do plano (com trava por organização) e devolve URLs de envio assinadas, presas ao tipo e ao hash do arquivo.
+3. O navegador envia direto ao R2 e chama `POST /api/uploads/complete`; o servidor confere que o objeto existe com o tamanho esperado e coloca a foto no acervo, com status `queued` para a indexação da P0.3.
+
+A franquia conta cada conteúdo distinto da organização uma vez, em qualquer acervo. Excluir uma foto de todos os acervos apaga o original e libera o espaço.
 
 ## Scripts
 

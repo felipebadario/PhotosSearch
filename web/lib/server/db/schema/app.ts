@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, index, integer, pgEnum, pgTable, real, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, index, integer, jsonb, pgEnum, pgTable, primaryKey, real, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth.ts";
 
 /**
@@ -63,5 +63,82 @@ export const auditLogs = pgTable(
   (t) => [index("audit_logs_org_time_idx").on(t.organizationId, t.createdAt)],
 );
 
+// ── Planos e assinatura: valores são dados, não código (preços ainda são hipóteses) ──
+
+export const plans = pgTable("plans", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(), // 'business' | 'event' | 'trial'
+  name: text("name").notNull(),
+  photoLimit: integer("photo_limit"), // null = personalizado
+  priceCents: integer("price_cents"), // null = sob consulta
+  currency: text("currency").notNull().default("BRL"),
+  features: jsonb("features").notNull().default({}),
+  sortOrder: integer("sort_order").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+});
+
+export const subscriptionStatus = pgEnum("subscription_status", ["trialing", "active", "past_due", "canceled"]);
+
+export const subscriptions = pgTable("subscriptions", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  organizationId: text("organization_id").notNull().unique().references(() => organization.id, { onDelete: "cascade" }),
+  planId: text("plan_id").notNull().references(() => plans.id),
+  status: subscriptionStatus("status").notNull().default("trialing"),
+  photoLimit: integer("photo_limit"), // sobrescreve o plano (Enterprise)
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Fotos ──
+
+/** uploading: reservada, aguardando o arquivo chegar ao armazenamento. */
+export const photoStatus = pgEnum("photo_status", ["uploading", "queued", "processing", "indexed", "error"]);
+
+export const photos = pgTable(
+  "photos",
+  {
+    id: text("id").primaryKey().default(sql`gen_random_uuid()::text`),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    contentHash: text("content_hash").notNull(), // SHA-256 em hex: base da deduplicação e da franquia
+    origin: text("origin").notNull().default("upload"), // 'upload' | provedor
+    externalRef: text("external_ref"),
+    storageKey: text("storage_key"),
+    originalName: text("original_name"),
+    mimeType: text("mime_type"),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
+    width: integer("width"),
+    height: integer("height"),
+    takenAt: timestamp("taken_at", { withTimezone: true }),
+    status: photoStatus("status").notNull().default("uploading"),
+    modelVersion: text("model_version"),
+    errorMessage: text("error_message"),
+    indexedAt: timestamp("indexed_at", { withTimezone: true }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("photos_org_hash_uidx").on(t.organizationId, t.contentHash),
+    index("photos_org_status_idx").on(t.organizationId, t.status),
+  ],
+);
+
+export const collectionPhotos = pgTable(
+  "collection_photos",
+  {
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    collectionId: text("collection_id").notNull().references(() => collections.id, { onDelete: "cascade" }),
+    photoId: text("photo_id").notNull().references(() => photos.id, { onDelete: "cascade" }),
+    albumId: text("album_id").references(() => albums.id, { onDelete: "set null" }),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.collectionId, t.photoId] }),
+    index("collection_photos_org_idx").on(t.organizationId, t.collectionId),
+    index("collection_photos_photo_idx").on(t.photoId),
+  ],
+);
+
 export type Collection = typeof collections.$inferSelect;
 export type Album = typeof albums.$inferSelect;
+export type Photo = typeof photos.$inferSelect;
+export type Plan = typeof plans.$inferSelect;

@@ -1,19 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, ImageUp } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ImageUp, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { CollectionForm } from "@/components/collections/CollectionForm";
+import { AdminPhotoGrid } from "@/components/admin-photos/AdminPhotoGrid";
+import { NewAlbumForm, RenameAlbumForm } from "@/components/admin-photos/AlbumForms";
+import { Uploader } from "@/components/admin-photos/Uploader";
 import { deleteCollectionAction, updateCollectionAction } from "@/lib/actions/collections";
+import { deleteAlbumAction } from "@/lib/actions/photos";
 import { collectionStatus } from "@/lib/collection-status";
-import { formatDay, toDateInput } from "@/lib/format";
+import { formatDay, formatNumber, plural, toDateInput } from "@/lib/format";
+import { cn } from "@/lib/cn";
 import { collectionKindLabel } from "@/lib/labels";
 import { db } from "@/lib/server/db";
 import { can } from "@/lib/server/permissions";
 import { getCollection } from "@/lib/server/repos/collections";
+import { countCollectionPhotos, getUsage, listAlbums, listCollectionPhotos } from "@/lib/server/repos/photos";
+import { getStorage } from "@/lib/server/storage";
 import { requireAdmin } from "@/lib/server/session";
 import { NotFoundError } from "@/lib/server/tenant-types";
 
@@ -22,7 +29,7 @@ export const metadata: Metadata = { title: "Acervo" };
 export default async function AcervoPage({ params, searchParams }: PageProps<"/acervos/[id]">) {
   const ctx = await requireAdmin();
   const { id } = await params;
-  const { salvo } = await searchParams;
+  const { salvo, album, mostrar } = await searchParams;
   const c = await getCollection(db, ctx, id).catch((err) => {
     if (err instanceof NotFoundError) notFound();
     throw err;
@@ -30,6 +37,28 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
   const status = collectionStatus(c);
   const canEdit = can(ctx.role, { collection: ["update"] });
   const canDelete = can(ctx.role, { collection: ["delete"] });
+  const canUpload = can(ctx.role, { photo: ["upload"] });
+  const canRemovePhotos = can(ctx.role, { photo: ["delete"] });
+  const storageReady = getStorage() !== null;
+
+  const albums = await listAlbums(db, ctx, c.id);
+  const albumParam = typeof album === "string" ? album : null;
+  const currentAlbum = albums.find((a) => a.id === albumParam) ?? null;
+  const filter = albumParam === "sem" ? "none" : currentAlbum?.id ?? null;
+  const shown = Math.min(Math.max(Number(mostrar) || 120, 120), 2000);
+  const [photos, total, usage] = await Promise.all([
+    listCollectionPhotos(db, ctx, c.id, { albumId: filter, limit: shown + 1 }),
+    countCollectionPhotos(db, ctx, c.id),
+    getUsage(db, ctx),
+  ]);
+  const hasMore = photos.length > shown;
+  const base = `/acervos/${c.id}`;
+  const albumHref = (id: string | null) => (id ? `${base}?album=${id}` : base);
+  const chips = [
+    { id: null, label: `Todas · ${formatNumber(total)}` },
+    ...albums.map((a) => ({ id: a.id, label: `${a.name} · ${formatNumber(a.photoCount)}` })),
+    ...(albums.length ? [{ id: "sem", label: "Sem álbum" }] : []),
+  ];
 
   return (
     <div className="space-y-10">
@@ -52,11 +81,99 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
         )}
       </div>
 
-      <EmptyState
-        icon={<ImageUp size={22} aria-hidden />}
-        title="O envio de fotos chega na próxima etapa"
-        description="Aqui você vai enviar fotos em lote, acompanhar o processamento e gerar o link e o QR Code para os participantes."
-      />
+      {canUpload &&
+        (storageReady ? (
+          <Uploader
+            collectionId={c.id}
+            albums={albums.map((a) => ({ id: a.id, name: a.name }))}
+            initialAlbumId={currentAlbum?.id ?? null}
+            usage={{ used: usage.used, limit: usage.limit }}
+          />
+        ) : (
+          <EmptyState
+            icon={<ImageUp size={22} aria-hidden />}
+            title="O envio de fotos ainda não está ativo"
+            description="Ele começa a funcionar assim que o armazenamento de fotos for configurado."
+          />
+        ))}
+
+      <section aria-labelledby="fotos" className="space-y-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="fotos" className="text-lg font-semibold text-nf-text">Fotos</h2>
+          <p className="text-sm text-nf-muted">
+            {plural(total, "foto", "fotos")} · {plural(albums.length, "álbum", "álbuns")}
+          </p>
+        </div>
+
+        <nav aria-label="Álbuns" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          {chips.map((chip) => {
+            const active = (chip.id ?? null) === (currentAlbum?.id ?? (albumParam === "sem" ? "sem" : null));
+            return (
+              <Link
+                key={chip.id ?? "todas"}
+                href={albumHref(chip.id)}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "inline-flex h-9 shrink-0 items-center rounded-full border px-3.5 text-sm transition-colors",
+                  active ? "border-nf-ink bg-nf-ink text-white" : "border-nf-line bg-nf-surface text-nf-text hover:border-nf-line-strong",
+                )}
+              >
+                {chip.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {canEdit && (
+          <div className="flex flex-wrap gap-3">
+            <details className="group w-full max-w-sm rounded-nf border border-nf-line bg-nf-surface p-4 open:shadow-sm sm:w-auto">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-nf-text">
+                <Plus size={16} aria-hidden /> Novo álbum
+              </summary>
+              <div className="mt-3">
+                <NewAlbumForm collectionId={c.id} />
+              </div>
+            </details>
+            {currentAlbum && (
+              <details className="w-full max-w-sm rounded-nf border border-nf-line bg-nf-surface p-4 open:shadow-sm sm:w-auto">
+                <summary className="cursor-pointer list-none text-sm font-medium text-nf-text">Editar álbum “{currentAlbum.name}”</summary>
+                <div className="mt-3 space-y-4">
+                  <RenameAlbumForm collectionId={c.id} albumId={currentAlbum.id} name={currentAlbum.name} />
+                  <form action={deleteAlbumAction} className="border-t border-nf-line pt-4">
+                    <input type="hidden" name="collectionId" value={c.id} />
+                    <input type="hidden" name="albumId" value={currentAlbum.id} />
+                    <p className="mb-3 text-sm text-nf-muted">Apagar o álbum mantém as fotos no acervo, sem álbum.</p>
+                    <SubmitButton size="sm" variant="danger" pendingLabel="Apagando...">Apagar álbum</SubmitButton>
+                  </form>
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+
+        {photos.length === 0 ? (
+          <EmptyState
+            icon={<ImageUp size={22} aria-hidden />}
+            title={total === 0 ? "Nenhuma foto ainda" : "Nenhuma foto aqui"}
+            description={total === 0 ? "Envie as primeiras fotos acima. Elas aparecem aqui assim que chegam." : "Escolha outro álbum ou envie fotos para este."}
+          />
+        ) : (
+          <>
+            <AdminPhotoGrid collectionId={c.id} photos={photos.slice(0, shown)} canDelete={canRemovePhotos} />
+            {hasMore && (
+              <div className="flex justify-center">
+                <Link
+                  href={`${albumHref(albumParam)}${albumParam ? "&" : "?"}mostrar=${shown + 120}`}
+                  scroll={false}
+                  className="inline-flex h-11 items-center rounded-nf border border-nf-line bg-nf-surface px-4.5 text-sm font-medium text-nf-text hover:border-nf-line-strong"
+                >
+                  Mostrar mais fotos
+                </Link>
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       {canEdit && (
         <section aria-labelledby="ajustes" className="max-w-2xl">
@@ -82,7 +199,7 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
       {canDelete && (
         <Card className="max-w-2xl border-nf-danger/30 p-5">
           <h2 className="font-semibold text-nf-text">Excluir {c.kind === "event" ? "evento" : "acervo"}</h2>
-          <p className="mt-1 text-sm text-nf-muted">Remove o acervo e os álbuns dele. Não dá para desfazer.</p>
+          <p className="mt-1 text-sm text-nf-muted">Remove o acervo e os álbuns dele. Fotos que não estão em outro acervo são apagadas e liberam espaço no plano. Não dá para desfazer.</p>
           <form action={deleteCollectionAction} className="mt-4">
             <input type="hidden" name="id" value={c.id} />
             <label className="mb-4 flex items-center gap-3 text-sm text-nf-text">
