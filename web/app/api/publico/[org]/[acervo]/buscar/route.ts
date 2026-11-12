@@ -58,7 +58,14 @@ export async function POST(req: Request, route: RouteContext<"/api/publico/[org]
     return json({ photos, pending: ready.pending, searchable: ready.searchable });
   } catch (err) {
     if (err instanceof SelfieError) return json({ error: err.message, code: err.code }, 422);
-    console.error("[busca] falha", err instanceof Error ? err.message : err);
+    const cause = err instanceof Error && err.cause instanceof Error ? ` (${(err.cause as Error & { code?: string }).code ?? ""} ${err.cause.message})` : "";
+    let host = "";
+    try {
+      host = new URL(process.env.WORKER_URL ?? "").host;
+    } catch {
+      host = "WORKER_URL inválida";
+    }
+    console.error("[busca] falha", err instanceof Error ? err.message : err, cause, `worker=${host}`);
     return json({ error: "A busca não respondeu agora. Tente de novo em instantes." }, 502);
   }
 }
