@@ -14,12 +14,12 @@ function secret() {
 }
 
 export function localDir() {
-  return process.env.LOCAL_STORAGE_DIR || path.join(process.cwd(), ".storage");
+  return process.env.LOCAL_STORAGE_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), ".storage");
 }
 
 function filePath(key: string) {
   if (!/^[a-zA-Z0-9/_-]+$/.test(key) || key.includes("..")) throw new Error("Chave inválida.");
-  return path.join(localDir(), key);
+  return path.join(/* turbopackIgnore: true */ localDir(), key);
 }
 
 export function signLocal(op: "put" | "get", key: string, exp: number, sha = "") {
