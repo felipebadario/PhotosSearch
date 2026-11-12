@@ -11,12 +11,16 @@ export function SubmitButton({
   variant = "primary",
   className,
   size = "md",
+  icon,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   pendingLabel: string;
   variant?: "primary" | "secondary" | "accent" | "danger" | "ghost";
   className?: string;
   size?: "sm" | "md" | "lg";
+  icon?: ReactNode;
+  "aria-label"?: string;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -26,7 +30,8 @@ export function SubmitButton({
       size={size}
       disabled={pending}
       className={className}
-      icon={pending ? <Loader2 size={16} className="animate-spin" aria-hidden /> : undefined}
+      icon={pending ? <Loader2 size={16} className="animate-spin" aria-hidden /> : icon}
+      aria-label={ariaLabel}
     >
       {pending ? pendingLabel : children}
     </Button>

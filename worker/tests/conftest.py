@@ -46,6 +46,9 @@ class FakeStorage:
     def get(self, key: str) -> bytes:
         return self.objects[key]
 
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        self.objects[key] = data
+
 
 @pytest.fixture
 def conn():

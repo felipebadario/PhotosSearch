@@ -9,7 +9,7 @@ Lê as fotos da fila, grava os rostos e responde a busca por selfie. Usa o motor
 
 ## Variáveis
 
-`DATABASE_URL`, `WORKER_SECRET`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. No Next: `WORKER_URL` e `WORKER_SECRET`.
+`DATABASE_URL`, `WORKER_SECRET`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` e, opcional, `GOOGLE_API_KEY` (pastas do Drive por link, conferidas a cada `DRIVE_SYNC_MINUTES`, padrão 30). No Next: `WORKER_URL` e `WORKER_SECRET`.
 
 ## Testes
 

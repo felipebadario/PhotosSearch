@@ -1,6 +1,6 @@
 import { db } from "@/lib/server/db";
 import { errorResponse, json, sameOrigin } from "@/lib/server/http";
-import { createAlbum, requestUploads, type UploadFile } from "@/lib/server/repos/photos";
+import { createAlbum, PHOTO_ORIGINS, requestUploads, type PhotoOrigin, type UploadFile } from "@/lib/server/repos/photos";
 import { getTenant } from "@/lib/server/session";
 import { getStorage, photoKey } from "@/lib/server/storage";
 
@@ -18,6 +18,7 @@ export async function POST(req: Request) {
       albumId?: string | null;
       albumName?: string | null;
       files?: UploadFile[];
+      origin?: string;
     };
     const collectionId = String(body.collectionId ?? "");
     const files = (Array.isArray(body.files) ? body.files : []).map((f) => ({
@@ -26,11 +27,13 @@ export async function POST(req: Request) {
       size: Number(f.size),
       type: String(f.type ?? ""),
       sha256: String(f.sha256 ?? "").toLowerCase(),
+      externalRef: f.externalRef ? String(f.externalRef) : null,
     }));
+    const origin = (PHOTO_ORIGINS as readonly string[]).includes(body.origin ?? "") ? (body.origin as PhotoOrigin) : "upload";
     let albumId = body.albumId ? String(body.albumId) : null;
     if (!albumId && body.albumName) albumId = (await createAlbum(db, ctx, collectionId, String(body.albumName))).id;
 
-    const result = await requestUploads(db, ctx, { collectionId, albumId, files }, (sha) => photoKey(ctx.organizationId, sha));
+    const result = await requestUploads(db, ctx, { collectionId, albumId, files, origin }, (sha) => photoKey(ctx.organizationId, sha));
     const items = await Promise.all(
       result.items.map(async (item) => {
         if (item.status !== "upload") return item;

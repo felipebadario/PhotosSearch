@@ -12,7 +12,11 @@ export const MAX_FILES_PER_REQUEST = 100;
 /** Reserva de envio abandonada some depois disso e libera a franquia. */
 const STALE_UPLOAD_MS = 2 * 60 * 60 * 1000;
 
-export type UploadFile = { clientId: string; name: string; size: number; type: string; sha256: string };
+export type UploadFile = { clientId: string; name: string; size: number; type: string; sha256: string; externalRef?: string | null };
+
+/** De onde a foto veio. O conteúdo sempre fica no nosso armazenamento. */
+export const PHOTO_ORIGINS = ["upload", "google_drive"] as const;
+export type PhotoOrigin = (typeof PHOTO_ORIGINS)[number];
 
 export type UploadItem =
   | { clientId: string; status: "upload"; photoId: string; key: string; type: string; sha256: string }
@@ -141,7 +145,7 @@ function check(file: UploadFile): string | null {
 export async function requestUploads(
   db: Db,
   ctx: TenantContext,
-  input: { collectionId: string; albumId?: string | null; files: UploadFile[] },
+  input: { collectionId: string; albumId?: string | null; files: UploadFile[]; origin?: PhotoOrigin },
   keyFor: (sha256: string) => string,
 ) {
   if (!can(ctx.role, { photo: ["upload"] })) throw new ForbiddenError();
@@ -214,6 +218,8 @@ export async function requestUploads(
             originalName: file.name.slice(0, 255),
             mimeType: file.type,
             sizeBytes: file.size,
+            origin: input.origin ?? "upload",
+            externalRef: file.externalRef?.slice(0, 255) || null,
             createdBy: ctx.userId,
           })
           .returning({ id: photos.id, storageKey: photos.storageKey });
