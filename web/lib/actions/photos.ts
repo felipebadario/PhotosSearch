@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/server/db";
 import { ValidationError } from "@/lib/server/repos/collections";
-import { createAlbum, deleteAlbum, removePhotosFromCollection, renameAlbum } from "@/lib/server/repos/photos";
+import { createAlbum, deleteAlbum, removePhotosFromCollection, renameAlbum, retryFailedPhotos } from "@/lib/server/repos/photos";
 import { requireAdmin } from "@/lib/server/session";
 import { getStorage } from "@/lib/server/storage";
 import { ForbiddenError, NotFoundError } from "@/lib/server/tenant-types";
+import { wakeWorker } from "@/lib/server/worker";
 
 export type AlbumFormState = { error?: string };
 
@@ -64,4 +65,12 @@ export async function removePhotosAction(collectionId: string, photoIds: string[
   } catch (err) {
     return { error: explain(err) };
   }
+}
+
+export async function retryFailedAction(form: FormData) {
+  const ctx = await requireAdmin();
+  const collectionId = String(form.get("collectionId") ?? "");
+  const n = await retryFailedPhotos(db, ctx, collectionId);
+  if (n > 0) await wakeWorker();
+  revalidatePath(`/acervos/${collectionId}`);
 }

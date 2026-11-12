@@ -24,3 +24,19 @@ class R2Storage:
         if obj["ContentLength"] > config.MAX_PHOTO_BYTES:
             raise ValueError("Arquivo maior que o limite de 30 MB.")
         return obj["Body"].read()
+
+
+class LocalStorage:
+    """Só para desenvolvimento: lê os originais da pasta do armazenamento local do web."""
+
+    def __init__(self):
+        import os
+        from pathlib import Path
+
+        self.root = Path(os.environ.get("LOCAL_STORAGE_DIR", ".storage")).resolve()
+
+    def get(self, key: str) -> bytes:
+        path = (self.root / key).resolve()
+        if not path.is_relative_to(self.root):
+            raise ValueError("Chave inválida.")
+        return path.read_bytes()

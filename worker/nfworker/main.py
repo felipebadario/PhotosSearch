@@ -68,11 +68,21 @@ def index_loop():
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if state.engine is None:
-        from .engine import InsightFaceEngine
-        from .storage import R2Storage
+        import os
 
-        state.engine = InsightFaceEngine()
-        state.storage = R2Storage()
+        if os.environ.get("NFWORKER_ENGINE") == "dev":
+            from .dev_engine import DevColorEngine
+            from .storage import LocalStorage
+
+            log.warning("MOTOR DE DESENVOLVIMENTO: não reconhece rostos de verdade.")
+            state.engine = DevColorEngine()
+            state.storage = LocalStorage()
+        else:
+            from .engine import InsightFaceEngine
+            from .storage import R2Storage
+
+            state.engine = InsightFaceEngine()
+            state.storage = R2Storage()
     if config.RUN_INDEXER:
         threading.Thread(target=index_loop, name="indexer", daemon=True).start()
     yield

@@ -4,11 +4,13 @@ import { notFound } from "next/navigation";
 import { CalendarX2, ImageOff } from "lucide-react";
 import { LogoMark } from "@/components/brand/Logo";
 import { PhotoGrid } from "@/components/photos/PhotoGrid";
+import { FaceSearch } from "@/components/public/FaceSearch";
 import { Avatar } from "@/components/ui/Avatar";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/server/db";
-import { countPublicPhotos, getPublicCollection, listPublicAlbums, listPublicPhotos } from "@/lib/server/repos/public";
+import { countPublicPhotos, getPublicCollection, listPublicAlbums, listPublicPhotos, searchReadiness } from "@/lib/server/repos/public";
+import { workerConfigured } from "@/lib/server/worker";
 import type { GalleryPhoto } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +63,12 @@ export default async function PublicCollectionPage({ params, searchParams }: Pag
   const albums = await listPublicAlbums(db, c);
   const selected = typeof albumParam === "string" ? albums.find((a) => a.id === albumParam) ?? null : null;
   const shown = Math.min(Math.max(Number(mostrar) || 120, 120), 2000);
-  const [rows, total] = await Promise.all([listPublicPhotos(db, c, { albumId: selected?.id ?? null, limit: shown + 1 }), countPublicPhotos(db, c)]);
+  const [rows, total, readiness] = await Promise.all([
+    listPublicPhotos(db, c, { albumId: selected?.id ?? null, limit: shown + 1 }),
+    countPublicPhotos(db, c),
+    searchReadiness(db, c),
+  ]);
+  const canSearch = workerConfigured() && readiness.searchable + readiness.pending > 0;
   const hasMore = rows.length > shown;
   const photoUrl = (id: string) => `/api/publico/${c.organizationSlug}/${c.slug}/fotos/${id}`;
   const photos: GalleryPhoto[] = rows.slice(0, shown).map((r) => ({
@@ -79,6 +86,7 @@ export default async function PublicCollectionPage({ params, searchParams }: Pag
     <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 pb-10 pt-8 sm:px-6">
       {header}
       <main className="mt-8 flex-1">
+        {canSearch && <FaceSearch orgSlug={c.organizationSlug} collectionSlug={c.slug} allowDownload={c.allowDownload} />}
         {albums.length > 0 && (
           <nav aria-label="Álbuns" className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1">
             {chips.map((chip) => {

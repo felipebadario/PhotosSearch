@@ -394,3 +394,38 @@ export async function deleteOrphanPhotos(db: Db, ctx: TenantContext, photoIds: s
     .returning({ key: photos.storageKey });
   return orphans.map((o) => o.key).filter((k): k is string => Boolean(k));
 }
+
+// ── Indexação (visão do Admin) ──
+
+export async function getIndexingStats(db: Db, ctx: TenantContext, collectionId: string) {
+  const rows = await db
+    .select({ status: photos.status, n: count() })
+    .from(collectionPhotos)
+    .innerJoin(photos, eq(photos.id, collectionPhotos.photoId))
+    .where(and(eq(collectionPhotos.organizationId, ctx.organizationId), eq(collectionPhotos.collectionId, collectionId)))
+    .groupBy(photos.status);
+  const n = (st: string) => rows.find((r) => r.status === st)?.n ?? 0;
+  const failed = await db
+    .select({ id: photos.id, name: photos.originalName, message: photos.errorMessage })
+    .from(collectionPhotos)
+    .innerJoin(photos, eq(photos.id, collectionPhotos.photoId))
+    .where(and(eq(collectionPhotos.organizationId, ctx.organizationId), eq(collectionPhotos.collectionId, collectionId), eq(photos.status, "error")))
+    .limit(10);
+  return { indexed: n("indexed"), pending: n("queued") + n("processing"), failed: n("error"), failures: failed };
+}
+
+/** Manda de volta para a fila as fotos que falharam neste acervo. */
+export async function retryFailedPhotos(db: Db, ctx: TenantContext, collectionId: string) {
+  if (!can(ctx.role, { photo: ["upload"] })) throw new ForbiddenError();
+  await ownCollection(db, ctx, collectionId);
+  const ids = db
+    .select({ id: collectionPhotos.photoId })
+    .from(collectionPhotos)
+    .where(and(eq(collectionPhotos.organizationId, ctx.organizationId), eq(collectionPhotos.collectionId, collectionId)));
+  const res = await db
+    .update(photos)
+    .set({ status: "queued", attempts: 0, errorMessage: null })
+    .where(and(eq(photos.organizationId, ctx.organizationId), eq(photos.status, "error"), inArray(photos.id, ids)))
+    .returning({ id: photos.id });
+  return res.length;
+}
