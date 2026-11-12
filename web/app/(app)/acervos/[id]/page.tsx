@@ -12,6 +12,7 @@ import { CollectionForm } from "@/components/collections/CollectionForm";
 import { AdminPhotoGrid } from "@/components/admin-photos/AdminPhotoGrid";
 import { IndexingStatus } from "@/components/admin-photos/IndexingStatus";
 import { ShareCard } from "@/components/admin-photos/ShareCard";
+import { DriveSources } from "@/components/admin-photos/DriveSources";
 import { NewAlbumForm, RenameAlbumForm } from "@/components/admin-photos/AlbumForms";
 import { Uploader } from "@/components/admin-photos/Uploader";
 import { deleteCollectionAction, updateCollectionAction } from "@/lib/actions/collections";
@@ -25,6 +26,8 @@ import { can } from "@/lib/server/permissions";
 import { getCollection } from "@/lib/server/repos/collections";
 import { countCollectionPhotos, getIndexingStats, getUsage, listAlbums, listCollectionPhotos } from "@/lib/server/repos/photos";
 import { workerConfigured } from "@/lib/server/worker";
+import { driveConfigured } from "@/lib/server/google-drive";
+import { listDriveSources } from "@/lib/server/repos/drive";
 import { getStorage } from "@/lib/server/storage";
 import { requireAdmin } from "@/lib/server/session";
 import { NotFoundError } from "@/lib/server/tenant-types";
@@ -51,12 +54,14 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
   const currentAlbum = albums.find((a) => a.id === albumParam) ?? null;
   const filter = albumParam === "sem" ? "none" : currentAlbum?.id ?? null;
   const shown = Math.min(Math.max(Number(mostrar) || 120, 120), 2000);
-  const [photos, total, usage, indexing, cover] = await Promise.all([
+  const showDrive = canUpload && driveConfigured();
+  const [photos, total, usage, indexing, cover, drives] = await Promise.all([
     listCollectionPhotos(db, ctx, c.id, { albumId: filter, limit: shown + 1 }),
     countCollectionPhotos(db, ctx, c.id),
     getUsage(db, ctx),
     getIndexingStats(db, ctx, c.id),
     canEdit && c.kind === "event" ? getCover(db, ctx.organizationId, c.id) : null,
+    showDrive ? listDriveSources(db, ctx, c.id) : Promise.resolve([]),
   ]);
   const hasMore = photos.length > shown;
   const base = `/acervos/${c.id}`;
@@ -103,6 +108,8 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
             description="Ele começa a funcionar assim que o armazenamento de fotos for configurado."
           />
         ))}
+
+      {showDrive && <DriveSources collectionId={c.id} sources={drives} workerReady={workerConfigured()} />}
 
       <ShareCard
         collectionId={c.id}
