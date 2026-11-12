@@ -1,3 +1,5 @@
+import { CoverForm } from "@/components/settings/CoverForm";
+import { getCover } from "@/lib/server/repos/covers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -49,11 +51,12 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
   const currentAlbum = albums.find((a) => a.id === albumParam) ?? null;
   const filter = albumParam === "sem" ? "none" : currentAlbum?.id ?? null;
   const shown = Math.min(Math.max(Number(mostrar) || 120, 120), 2000);
-  const [photos, total, usage, indexing] = await Promise.all([
+  const [photos, total, usage, indexing, cover] = await Promise.all([
     listCollectionPhotos(db, ctx, c.id, { albumId: filter, limit: shown + 1 }),
     countCollectionPhotos(db, ctx, c.id),
     getUsage(db, ctx),
     getIndexingStats(db, ctx, c.id),
+    canEdit && c.kind === "event" ? getCover(db, ctx.organizationId, c.id) : null,
   ]);
   const hasMore = photos.length > shown;
   const base = `/acervos/${c.id}`;
@@ -193,6 +196,7 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
       {canEdit && (
         <section aria-labelledby="ajustes" className="max-w-2xl">
           <h2 id="ajustes" className="mb-4 text-lg font-semibold text-nf-text">Ajustes</h2>
+          {c.kind === "event" && <div className="mb-4"><CoverForm image={cover} collectionId={c.id} /></div>}
           <CollectionForm
             action={updateCollectionAction}
             submitLabel="Salvar alterações"

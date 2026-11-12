@@ -5,6 +5,7 @@ import { after, before, describe, it } from "node:test";
 import { inArray } from "drizzle-orm";
 import { db, sql } from "../lib/server/db/index.ts";
 import { member, organization, user } from "../lib/server/db/schema/index.ts";
+import { getCover, saveCover } from "../lib/server/repos/covers.ts";
 import { createCollection } from "../lib/server/repos/collections.ts";
 import { completeUploads, createAlbum, listCollectionPhotos, requestUploads } from "../lib/server/repos/photos.ts";
 import { countPublicPhotos, getPublicCollection, getPublicPhoto, listPublicAlbums, listPublicPhotos, setCollectionSharing } from "../lib/server/repos/public.ts";
@@ -59,6 +60,22 @@ describe("acervo compartilhado por link", () => {
     const item = res.items[0];
     if (item.status === "upload") await completeUploads(db, ctx, { collectionId, albumId, photoIds: [item.photoId] }, async () => ({ size: f.size }));
   }
+
+  it("capas de evento e organização são independentes e respeitam o tenant e o papel", async () => {
+    const event = await createCollection(db, a, { kind: "event", name: "Encontro", startsAt: new Date(0), endsAt: new Date(1) });
+    const editor = { ...a, role: "member" as const };
+    await saveCover(db, a, null, "capa inicial");
+    await saveCover(db, a, null, "capa da organização");
+    await saveCover(db, editor, event.id, "capa do evento");
+    assert.equal(await getCover(db, a.organizationId, null), "capa da organização");
+    assert.equal(await getCover(db, a.organizationId, event.id), "capa do evento");
+    await assert.rejects(saveCover(db, editor, null, null), ForbiddenError);
+    await assert.rejects(saveCover(db, b, event.id, null), NotFoundError);
+    assert.equal(await getCover(db, b.organizationId, event.id), null);
+    await saveCover(db, editor, event.id, null);
+    assert.equal(await getCover(db, a.organizationId, event.id), null);
+    assert.equal(await getCover(db, a.organizationId, null), "capa da organização");
+  });
 
   it("acervo privado não existe para o público", async () => {
     assert.equal(await getPublicCollection(db, a.slug, privado.slug), null);

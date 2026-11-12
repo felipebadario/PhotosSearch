@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, customType, index, integer, jsonb, pgEnum, pgTable, primaryKey, real, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, customType, index, integer, jsonb, pgEnum, pgTable, primaryKey, real, text, timestamp, unique, uniqueIndex } from "drizzle-orm/pg-core";
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 import { organization, user } from "./auth.ts";
@@ -37,6 +37,16 @@ export const collections = pgTable(
     index("collections_org_idx").on(t.organizationId),
     check("collections_event_dates", sql`${t.kind} = 'permanent' or (${t.startsAt} is not null and ${t.endsAt} is not null and ${t.endsAt} >= ${t.startsAt})`),
   ],
+);
+
+export const covers = pgTable(
+  "covers",
+  {
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    collectionId: text("collection_id").references(() => collections.id, { onDelete: "cascade" }),
+    image: text("image").notNull(), // JPEG de capa já reduzido, em data URL
+  },
+  (t) => [unique("covers_target").on(t.organizationId, t.collectionId).nullsNotDistinct()],
 );
 
 export const albums = pgTable(
