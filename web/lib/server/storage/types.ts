@@ -5,8 +5,8 @@ export interface PhotoStorage {
   readonly name: "r2" | "local";
   /** URL de envio válida por poucos minutos, presa ao tipo e ao SHA-256 do arquivo. */
   presignPut(key: string, file: { contentType: string; sha256Hex: string }): Promise<PresignedUpload>;
-  /** URL de leitura temporária. */
-  presignGet(key: string): Promise<string>;
+  /** URL de leitura temporária. Com downloadName, o navegador baixa o arquivo com esse nome. */
+  presignGet(key: string, opts?: { downloadName?: string }): Promise<string>;
   /** Tamanho do objeto, ou null se ele não existe. */
   head(key: string): Promise<{ size: number } | null>;
   remove(keys: string[]): Promise<void>;
@@ -17,4 +17,9 @@ export const READ_URL_TTL_SECONDS = 10 * 60;
 
 export function hexToBase64(hex: string) {
   return Buffer.from(hex, "hex").toString("base64");
+}
+
+/** Nome de arquivo seguro para o cabeçalho Content-Disposition. */
+export function safeFileName(name: string) {
+  return name.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/["\\/]/g, "").trim().slice(0, 120) || "foto.jpg";
 }

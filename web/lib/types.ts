@@ -131,6 +131,8 @@ export type SearchScope = { kind: "library" } | { kind: "album"; albumId: string
 export interface GalleryPhoto {
   id: string;
   url: string;
+  /** Quando existe, o botão de baixar usa esta URL (com nome de arquivo). */
+  downloadUrl?: string;
   thumbnailUrl: string;
   albumName: string | null;
   source: PhotoSource;

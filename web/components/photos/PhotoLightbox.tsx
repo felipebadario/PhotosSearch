@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Download, Share2, X } from "lucide-react";
 import type { GalleryPhoto } from "@/lib/types";
-import { sourceLabel } from "@/lib/labels";
 import { formatShortDate } from "@/lib/format";
 
 export function PhotoLightbox({
@@ -55,11 +54,7 @@ export function PhotoLightbox({
     }
   }
 
-  const details = [
-    photo.albumName ?? "Fora de álbuns",
-    sourceLabel(photo.source),
-    formatShortDate(photo.takenAt),
-  ];
+  const details = [photo.albumName, photo.takenAt ? formatShortDate(photo.takenAt) : null].filter(Boolean);
 
   return (
     <div
@@ -121,7 +116,7 @@ export function PhotoLightbox({
         className="flex flex-col items-center gap-4 px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="text-center text-xs text-white/60">{details.join(" · ")}</p>
+        {details.length > 0 && <p className="text-center text-xs text-white/60">{details.join(" · ")}</p>}
         <div className="flex gap-2">
           {onPrev && (
             <button
@@ -135,7 +130,7 @@ export function PhotoLightbox({
           )}
           {allowDownload && (
             <a
-              href={photo.url}
+              href={photo.downloadUrl ?? photo.url}
               download
               target="_blank"
               rel="noopener noreferrer"

@@ -26,7 +26,10 @@ export async function GET(req: Request, route: RouteContext<"/api/storage/local/
   if (!verifyLocal("get", p.key, p.exp, "", p.sig)) return new Response("Assinatura inválida.", { status: 403 });
   try {
     const data = await readLocal(p.key);
-    return new Response(new Uint8Array(data), { headers: { "content-type": "image/jpeg", "cache-control": "private, max-age=300" } });
+    const dl = new URL(req.url).searchParams.get("dl");
+    const headers: Record<string, string> = { "content-type": "image/jpeg", "cache-control": "private, max-age=300" };
+    if (dl) headers["content-disposition"] = `attachment; filename="${dl.replace(/[^\x20-\x7e]|"/g, "")}"`;
+    return new Response(new Uint8Array(data), { headers });
   } catch {
     return new Response(null, { status: 404 });
   }
