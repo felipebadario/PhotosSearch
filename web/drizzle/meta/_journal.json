@@ -15,6 +15,13 @@
       "when": 1794489044260,
       "tag": "0001_envio_fotos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794492316946,
+      "tag": "0002_busca_facial",
+      "breakpoints": true
     }
   ]
 }
