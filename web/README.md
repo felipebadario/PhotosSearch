@@ -73,3 +73,7 @@ Toda leitura ou escrita de dados de cliente passa por `lib/server/repos`, que re
 ## O que ainda é demonstração
 
 A página pública `/{handle}/{album}` e os componentes de busca e importação herdados da Fase 1 usam `lib/mock-data.ts`. Eles serão ligados ao banco nas etapas P0.2 a P0.4 (ver `../docs/roadmap.md`).
+
+## Link público e QR Code
+
+Cada acervo começa privado. No Admin, "Abrir por link" muda a visibilidade para `link` e mostra o endereço `/{organização}/{acervo}` e o QR Code. A página pública (`app/(public)/[handle]/[album]`) mostra a galeria do acervo, por álbum, sem login; as fotos saem por `GET /api/publico/{organização}/{acervo}/fotos/{id}`, que confere a cada pedido que o acervo está aberto e que a foto é dele. Evento que passou de "aberto até" mostra "encerrado" e não entrega fotos. A busca por selfie entra nesta mesma página depois da indexação (P0.3/P0.4).

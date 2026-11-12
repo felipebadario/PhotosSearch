@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { CollectionForm } from "@/components/collections/CollectionForm";
 import { AdminPhotoGrid } from "@/components/admin-photos/AdminPhotoGrid";
+import { ShareCard } from "@/components/admin-photos/ShareCard";
 import { NewAlbumForm, RenameAlbumForm } from "@/components/admin-photos/AlbumForms";
 import { Uploader } from "@/components/admin-photos/Uploader";
 import { deleteCollectionAction, updateCollectionAction } from "@/lib/actions/collections";
@@ -96,6 +97,15 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
             description="Ele começa a funcionar assim que o armazenamento de fotos for configurado."
           />
         ))}
+
+      <ShareCard
+        collectionId={c.id}
+        collectionSlug={c.slug}
+        orgSlug={ctx.organization.slug}
+        shared={c.visibility === "link"}
+        closed={c.kind === "event" && c.publicUntil != null && c.publicUntil < new Date()}
+        canEdit={canEdit}
+      />
 
       <section aria-labelledby="fotos" className="space-y-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
