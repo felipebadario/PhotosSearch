@@ -3,7 +3,7 @@ app = "nossafoto-worker"
 primary_region = "gru"
 
 [build]
-  dockerfile = "worker/Dockerfile"
+  dockerfile = "Dockerfile"  # relativo a este fly.toml; o contexto (.) é a raiz do repo
 
 [http_service]
   internal_port = 8080
