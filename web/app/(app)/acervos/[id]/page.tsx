@@ -8,6 +8,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { CollectionForm } from "@/components/collections/CollectionForm";
 import { AdminPhotoGrid } from "@/components/admin-photos/AdminPhotoGrid";
+import { IndexingStatus } from "@/components/admin-photos/IndexingStatus";
+import { ShareCard } from "@/components/admin-photos/ShareCard";
 import { NewAlbumForm, RenameAlbumForm } from "@/components/admin-photos/AlbumForms";
 import { Uploader } from "@/components/admin-photos/Uploader";
 import { deleteCollectionAction, updateCollectionAction } from "@/lib/actions/collections";
@@ -19,7 +21,8 @@ import { collectionKindLabel } from "@/lib/labels";
 import { db } from "@/lib/server/db";
 import { can } from "@/lib/server/permissions";
 import { getCollection } from "@/lib/server/repos/collections";
-import { countCollectionPhotos, getUsage, listAlbums, listCollectionPhotos } from "@/lib/server/repos/photos";
+import { countCollectionPhotos, getIndexingStats, getUsage, listAlbums, listCollectionPhotos } from "@/lib/server/repos/photos";
+import { workerConfigured } from "@/lib/server/worker";
 import { getStorage } from "@/lib/server/storage";
 import { requireAdmin } from "@/lib/server/session";
 import { NotFoundError } from "@/lib/server/tenant-types";
@@ -46,10 +49,11 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
   const currentAlbum = albums.find((a) => a.id === albumParam) ?? null;
   const filter = albumParam === "sem" ? "none" : currentAlbum?.id ?? null;
   const shown = Math.min(Math.max(Number(mostrar) || 120, 120), 2000);
-  const [photos, total, usage] = await Promise.all([
+  const [photos, total, usage, indexing] = await Promise.all([
     listCollectionPhotos(db, ctx, c.id, { albumId: filter, limit: shown + 1 }),
     countCollectionPhotos(db, ctx, c.id),
     getUsage(db, ctx),
+    getIndexingStats(db, ctx, c.id),
   ]);
   const hasMore = photos.length > shown;
   const base = `/acervos/${c.id}`;
@@ -96,6 +100,17 @@ export default async function AcervoPage({ params, searchParams }: PageProps<"/a
             description="Ele começa a funcionar assim que o armazenamento de fotos for configurado."
           />
         ))}
+
+      <ShareCard
+        collectionId={c.id}
+        collectionSlug={c.slug}
+        orgSlug={ctx.organization.slug}
+        shared={c.visibility === "link"}
+        closed={c.kind === "event" && c.publicUntil != null && c.publicUntil < new Date()}
+        canEdit={canEdit}
+      />
+
+      <IndexingStatus collectionId={c.id} stats={indexing} workerReady={workerConfigured()} canRetry={canUpload} />
 
       <section aria-labelledby="fotos" className="space-y-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

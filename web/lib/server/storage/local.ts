@@ -1,7 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { READ_URL_TTL_SECONDS, UPLOAD_URL_TTL_SECONDS, type PhotoStorage } from "./types.ts";
+import { READ_URL_TTL_SECONDS, safeFileName, UPLOAD_URL_TTL_SECONDS, type PhotoStorage } from "./types.ts";
 
 /**
  * Armazenamento em disco para desenvolvimento e testes, com o mesmo contrato do R2:
@@ -56,7 +56,8 @@ export function createLocalStorage(): PhotoStorage {
     async presignPut(key, file) {
       return { url: url("put", key, UPLOAD_URL_TTL_SECONDS, file.sha256Hex), headers: { "content-type": file.contentType } };
     },
-    presignGet: async (key) => url("get", key, READ_URL_TTL_SECONDS),
+    presignGet: async (key, opts) =>
+      url("get", key, READ_URL_TTL_SECONDS) + (opts?.downloadName ? `&dl=${encodeURIComponent(safeFileName(opts.downloadName))}` : ""),
     async head(key) {
       try {
         return { size: (await stat(filePath(key))).size };

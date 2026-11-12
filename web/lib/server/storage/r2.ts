@@ -1,5 +1,5 @@
 import { AwsClient } from "aws4fetch";
-import { hexToBase64, READ_URL_TTL_SECONDS, UPLOAD_URL_TTL_SECONDS, type PhotoStorage } from "./types.ts";
+import { hexToBase64, READ_URL_TTL_SECONDS, safeFileName, UPLOAD_URL_TTL_SECONDS, type PhotoStorage } from "./types.ts";
 
 type R2Config = { accountId: string; accessKeyId: string; secretAccessKey: string; bucket: string };
 
@@ -14,9 +14,10 @@ export function createR2Storage(cfg: R2Config): PhotoStorage {
   const base = `https://${cfg.accountId}.r2.cloudflarestorage.com/${cfg.bucket}`;
   const objectUrl = (key: string) => `${base}/${key.split("/").map(encodeURIComponent).join("/")}`;
 
-  async function presign(method: string, key: string, ttl: number, headers: Record<string, string> = {}) {
+  async function presign(method: string, key: string, ttl: number, headers: Record<string, string> = {}, query: Record<string, string> = {}) {
     const url = new URL(objectUrl(key));
     url.searchParams.set("X-Amz-Expires", String(ttl));
+    for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
     const signed = await client.sign(new Request(url, { method, headers }), { aws: { signQuery: true } });
     return signed.url;
   }
@@ -28,7 +29,14 @@ export function createR2Storage(cfg: R2Config): PhotoStorage {
       const headers = { "content-type": file.contentType, "x-amz-checksum-sha256": hexToBase64(file.sha256Hex) };
       return { url: await presign("PUT", key, UPLOAD_URL_TTL_SECONDS, headers), headers };
     },
-    presignGet: (key) => presign("GET", key, READ_URL_TTL_SECONDS),
+    presignGet: (key, opts) =>
+      presign(
+        "GET",
+        key,
+        READ_URL_TTL_SECONDS,
+        {},
+        opts?.downloadName ? { "response-content-disposition": `attachment; filename="${safeFileName(opts.downloadName)}"` } : {},
+      ),
     async head(key) {
       const res = await client.fetch(objectUrl(key), { method: "HEAD" });
       if (res.status === 404) return null;
