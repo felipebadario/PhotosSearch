@@ -1,22 +1,25 @@
 import type { NextConfig } from "next";
 
 /**
- * Redirecionamentos das rotas da v0.1 para a navegação nova, para que links
- * antigos (favoritos, mensagens) continuem funcionando.
+ * Redirecionamentos das rotas antigas (v0.1 e Fase 1) para o NossaFoto Admin,
+ * para que links salvos continuem levando a um lugar útil.
  */
 const nextConfig: NextConfig = {
   async redirects() {
+    const to = (source: string, destination: string) => ({ source, destination, permanent: false });
     return [
-      { source: "/dashboard", destination: "/", permanent: false },
-      { source: "/albums", destination: "/acervo/albuns", permanent: false },
-      { source: "/albums/new", destination: "/acervo/importar", permanent: false },
-      { source: "/albums/:id", destination: "/acervo/albuns/:id", permanent: false },
-      { source: "/albums/:id/fotos", destination: "/acervo/albuns/:id", permanent: false },
-      { source: "/albums/:id/compartilhamento", destination: "/acervo/albuns/:id/compartilhar", permanent: false },
-      { source: "/albums/:id/configuracoes", destination: "/acervo/albuns/:id/ajustes", permanent: false },
-      { source: "/storage", destination: "/conta/consumo", permanent: false },
-      { source: "/integrations", destination: "/fontes", permanent: false },
-      { source: "/settings", destination: "/conta", permanent: false },
+      to("/dashboard", "/painel"),
+      to("/albums/:path*", "/acervos"),
+      to("/storage", "/assinatura"),
+      to("/integrations", "/integracoes"),
+      to("/settings", "/configuracoes"),
+      to("/buscar/:path*", "/acervos"),
+      to("/acervo/:path*", "/acervos"),
+      to("/fontes", "/integracoes"),
+      to("/conta", "/configuracoes"),
+      to("/conta/assinatura", "/assinatura"),
+      to("/conta/consumo", "/assinatura"),
+      to("/conta/privacidade", "/configuracoes"),
     ];
   },
 };

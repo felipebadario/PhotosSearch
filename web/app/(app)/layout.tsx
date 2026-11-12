@@ -1,9 +1,8 @@
 import { AppShell } from "@/components/layout/AppShell";
 
-// Os dados desta fase vivem em memória no servidor (lib/mock-data.ts), então
-// cada página é renderizada por requisição em vez de pré-gerada no build.
+// Tudo no Admin depende da sessão e do banco: nada é pré-gerado no build.
 export const dynamic = "force-dynamic";
 
-export default function AppLayout({ children }: LayoutProps<"/">) {
+export default function AdminLayout({ children }: LayoutProps<"/">) {
   return <AppShell>{children}</AppShell>;
 }

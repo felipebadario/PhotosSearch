@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import { getCurrentUser, getSubscription } from "@/lib/api/account";
+import { requireAdmin } from "@/lib/server/session";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
 import { MobileTopbar } from "./MobileTopbar";
 
 export async function AppShell({ children }: { children: ReactNode }) {
-  const [user, { plan }] = await Promise.all([getCurrentUser(), getSubscription()]);
+  const { user, organization } = await requireAdmin();
 
   return (
     <div className="flex min-h-screen">
@@ -15,7 +15,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
       >
         Pular para o conteúdo
       </a>
-      <Sidebar userName={user.name} planName={plan.name} />
+      <Sidebar userName={user.name} organizationName={organization.name} />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileTopbar userName={user.name} />
         <main id="conteudo" className="flex-1 px-4 pb-28 pt-6 sm:px-6 md:px-10 md:pb-12 md:pt-10">

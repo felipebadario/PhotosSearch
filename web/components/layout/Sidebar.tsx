@@ -5,15 +5,17 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/brand/Logo";
 import { Avatar } from "@/components/ui/Avatar";
+import { LogOut } from "lucide-react";
+import { signOutAction } from "@/lib/actions/auth";
 import { isActive, navItems } from "./nav-items";
 
-export function Sidebar({ userName, planName }: { userName: string; planName: string }) {
+export function Sidebar({ userName, organizationName }: { userName: string; organizationName: string }) {
   const pathname = usePathname();
 
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-nf-line bg-nf-surface md:flex">
       <div className="px-5 pb-6 pt-6">
-        <Link href="/" aria-label="NossaFoto, início" className="inline-flex rounded-nf">
+        <Link href="/painel" aria-label="NossaFoto, painel" className="inline-flex rounded-nf">
           <Logo size={28} />
         </Link>
       </div>
@@ -65,16 +67,28 @@ export function Sidebar({ userName, planName }: { userName: string; planName: st
         })}
       </nav>
 
-      <Link
-        href="/conta"
-        className="mx-3 mb-3 flex items-center gap-3 rounded-nf px-2 py-2.5 transition-colors hover:bg-nf-sunken"
-      >
-        <Avatar name={userName} size={34} />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium text-nf-text">{userName}</span>
-          <span className="block truncate text-xs text-nf-muted">Plano {planName}</span>
-        </span>
-      </Link>
+      <div className="mx-3 mb-3 flex items-center gap-1 rounded-nf py-1.5 pl-2">
+        <Link
+          href="/configuracoes"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-nf py-1 transition-colors hover:bg-nf-sunken"
+        >
+          <Avatar name={userName} size={34} />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium text-nf-text">{userName}</span>
+            <span className="block truncate text-xs text-nf-muted">{organizationName}</span>
+          </span>
+        </Link>
+        <form action={signOutAction}>
+          <button
+            type="submit"
+            aria-label="Sair"
+            title="Sair"
+            className="flex h-11 w-11 items-center justify-center rounded-nf text-nf-muted transition-colors hover:bg-nf-sunken hover:text-nf-text"
+          >
+            <LogOut size={17} aria-hidden />
+          </button>
+        </form>
+      </div>
     </aside>
   );
 }
