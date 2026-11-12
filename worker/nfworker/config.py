@@ -25,3 +25,11 @@ SEARCH_CACHE_COLLECTIONS = int(os.environ.get("SEARCH_CACHE_COLLECTIONS", "8"))
 DEFAULT_THRESHOLD = 0.45
 # Desligado nos testes, que processam a fila à mão.
 RUN_INDEXER = os.environ.get("NFWORKER_RUN_INDEXER", "1") == "1"
+
+# Pastas do Google Drive compartilhadas por link (só leitura, com a chave de API do NossaFoto).
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
+DRIVE_SYNC_MINUTES = int(os.environ.get("DRIVE_SYNC_MINUTES", "30"))
+DRIVE_STUCK_MINUTES = 60
+DRIVE_MAX_FILES = int(os.environ.get("DRIVE_MAX_FILES", "20000"))
+DRIVE_MAX_DEPTH = 4
+ACCEPTED_TYPES = ("image/jpeg", "image/png", "image/webp")

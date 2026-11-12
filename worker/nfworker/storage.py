@@ -6,6 +6,8 @@ from . import config
 class Storage(Protocol):
     def get(self, key: str) -> bytes: ...
 
+    def put(self, key: str, data: bytes, content_type: str) -> None: ...
+
 
 class R2Storage:
     def __init__(self):
@@ -25,6 +27,9 @@ class R2Storage:
             raise ValueError("Arquivo maior que o limite de 30 MB.")
         return obj["Body"].read()
 
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        self._client.put_object(Bucket=config.R2_BUCKET, Key=key, Body=data, ContentType=content_type)
+
 
 class LocalStorage:
     """Só para desenvolvimento: lê os originais da pasta do armazenamento local do web."""
@@ -40,3 +45,10 @@ class LocalStorage:
         if not path.is_relative_to(self.root):
             raise ValueError("Chave inválida.")
         return path.read_bytes()
+
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        path = (self.root / key).resolve()
+        if not path.is_relative_to(self.root):
+            raise ValueError("Chave inválida.")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)

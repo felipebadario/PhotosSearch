@@ -124,6 +124,7 @@ export const photos = pgTable(
   (t) => [
     uniqueIndex("photos_org_hash_uidx").on(t.organizationId, t.contentHash),
     index("photos_org_status_idx").on(t.organizationId, t.status),
+    index("photos_org_external_idx").on(t.organizationId, t.externalRef),
   ],
 );
 
@@ -141,6 +142,35 @@ export const collectionPhotos = pgTable(
     index("collection_photos_org_idx").on(t.organizationId, t.collectionId),
     index("collection_photos_photo_idx").on(t.photoId),
   ],
+);
+
+// ── Fontes externas ──
+
+/**
+ * Pasta do Google Drive compartilhada por link ("qualquer pessoa com o link").
+ * O serviço de rostos lista a pasta com a chave de API do NossaFoto, copia as fotos
+ * novas para o nosso armazenamento e repete de tempos em tempos. Nenhuma credencial
+ * do cliente é guardada. Subpastas viram álbuns.
+ */
+export const driveSources = pgTable(
+  "drive_sources",
+  {
+    id: text("id").primaryKey().default(sql`gen_random_uuid()::text`),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    collectionId: text("collection_id").notNull().references(() => collections.id, { onDelete: "cascade" }),
+    folderId: text("folder_id").notNull(),
+    resourceKey: text("resource_key"),
+    folderName: text("folder_name"),
+    status: text("status").notNull().default("pending"), // pending | syncing | ok | error
+    lastError: text("last_error"),
+    filesSeen: integer("files_seen").notNull().default(0),
+    filesImported: integer("files_imported").notNull().default(0),
+    syncRequestedAt: timestamp("sync_requested_at", { withTimezone: true }).defaultNow(),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("drive_sources_collection_folder_uidx").on(t.collectionId, t.folderId), index("drive_sources_org_idx").on(t.organizationId)],
 );
 
 // ── Rostos e buscas ──
@@ -178,3 +208,4 @@ export type Collection = typeof collections.$inferSelect;
 export type Album = typeof albums.$inferSelect;
 export type Photo = typeof photos.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
+export type DriveSource = typeof driveSources.$inferSelect;

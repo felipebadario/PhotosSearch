@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 import psycopg
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 
-from . import config, indexer, search
+from . import config, drive, indexer, search
 from .engine import Engine, InvalidImage, NoFace
 from .storage import Storage
 
@@ -30,6 +30,7 @@ class State:
     storage: Storage | None = None
     stop = threading.Event()
     wake = threading.Event()
+    drive_wake = threading.Event()
     last_error: str | None = None
     indexed = 0
 
@@ -65,6 +66,39 @@ def index_loop():
             state.stop.wait(10)
 
 
+def drive_loop():
+    """Confere as pastas do Google Drive ligadas aos acervos, uma por vez."""
+    client = drive.DriveClient(config.GOOGLE_API_KEY)
+    conn = None
+    started = False
+    last_requeue = 0.0
+    while not state.stop.is_set():
+        try:
+            if conn is None or conn.closed:
+                conn = connect()
+            if not started:
+                drive.reset_on_start(conn)
+                started = True
+            if time.monotonic() - last_requeue > 300:
+                drive.requeue_stuck(conn)
+                last_requeue = time.monotonic()
+            queued = drive.run_once(conn, client, state.storage)
+            if queued > 0:
+                state.wake.set()
+            if queued < 0:
+                state.drive_wake.wait(60)
+                state.drive_wake.clear()
+        except Exception:
+            log.exception("erro no ciclo do Google Drive")
+            try:
+                if conn is not None:
+                    conn.close()
+            except Exception:
+                pass
+            conn = None
+            state.stop.wait(30)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if state.engine is None:
@@ -85,9 +119,14 @@ async def lifespan(_: FastAPI):
             state.storage = R2Storage()
     if config.RUN_INDEXER:
         threading.Thread(target=index_loop, name="indexer", daemon=True).start()
+        if config.GOOGLE_API_KEY:
+            threading.Thread(target=drive_loop, name="drive", daemon=True).start()
+        else:
+            log.warning("GOOGLE_API_KEY ausente: pastas do Google Drive não serão conferidas.")
     yield
     state.stop.set()
     state.wake.set()
+    state.drive_wake.set()
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -117,6 +156,7 @@ def wake(authorization: str | None = Header(default=None)):
     """O Next chama depois de um envio, para a indexação começar sem esperar o próximo ciclo."""
     authorize(authorization)
     state.wake.set()
+    state.drive_wake.set()
     return {"ok": True}
 
 

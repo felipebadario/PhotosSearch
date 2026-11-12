@@ -22,6 +22,7 @@ npm run dev
 | `BETTER_AUTH_URL` | Opcional | URL pública. Sem ela, usa o domínio do deploy da Vercel |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Vercel (Production e Preview) | Bucket privado do Cloudflare R2 com os originais. Sem elas, a Vercel mostra o envio como "não ativo" e o desenvolvimento local grava em `./.storage` |
 | `WORKER_URL`, `WORKER_SECRET` | Vercel (Production e Preview) | Serviço de rostos no Fly.io (`worker/`). Sem elas, a busca por selfie não aparece na página pública |
+| `GOOGLE_API_KEY` | Vercel e GitHub (secret do worker) | Chave de API do Google com a Drive API ligada. Lê pastas compartilhadas como "Qualquer pessoa com o link" (verificação no Admin e cópia no worker). Sem ela, o card de pastas do Drive não aparece |
 | `STORAGE_DRIVER=local`, `LOCAL_STORAGE_DIR` | Só local | Força o disco local mesmo com `next start` (testes de ponta a ponta) |
 
 Nenhum valor real vai para o repositório.

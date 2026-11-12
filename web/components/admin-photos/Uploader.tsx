@@ -3,13 +3,12 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CheckCircle2, FolderUp, HardDrive, ImagePlus, Loader2, UploadCloud } from "lucide-react";
+import { AlertCircle, CheckCircle2, FolderUp, ImagePlus, Loader2, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select } from "@/components/ui/Input";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { formatNumber, plural } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { chooseFromDrive, DriveAuthError, driveConfigured, driveDownload, driveMetadata } from "@/lib/google-drive";
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 30 * 1024 * 1024;
@@ -40,12 +39,7 @@ type UploadItem = {
   upload?: { url: string; headers: Record<string, string> };
 };
 
-/** Um arquivo a enviar, do computador ou do Drive. `hash` já conhecido evita baixar só para comparar. */
-type Item = { name: string; size: number; type: string; externalRef?: string; hash?: string | null; load: () => Promise<Blob> };
-
-const acceptable = (i: { type: string; size: number }) => ACCEPTED.includes(i.type) && i.size > 0 && i.size <= MAX_BYTES;
-
-async function sha256(file: Blob) {
+async function sha256(file: File) {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -98,7 +92,6 @@ export function Uploader({
   const [tally, setTally] = useState<Tally | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [phase, setPhase] = useState<string | null>(null);
   // Atualizada a cada lote; a do servidor vale de novo quando a página recarrega.
   const [liveUsage, setCurrentUsage] = useState<Usage | null>(null);
   const currentUsage = busy && liveUsage ? liveUsage : usage;
@@ -115,35 +108,18 @@ export function Uploader({
       return next;
     });
 
-  async function sendGroup(
-    items: Item[],
-    target: { albumId?: string | null; albumName?: string | null },
-    origin: "upload" | "google_drive" = "upload",
-    batch = BATCH,
-  ) {
+  async function sendGroup(files: File[], target: { albumId?: string | null; albumName?: string | null }) {
     let albumId = target.albumId ?? null;
     let albumName = albumId ? null : (target.albumName ?? null);
-    for (let start = 0; start < items.length; start += batch) {
-      const chunk = items.slice(start, start + batch);
-      const prepared = await mapLimit(chunk, PARALLEL, async (item) => {
-        if (item.hash) return { item, hash: item.hash, blob: null as Blob | null };
-        const blob = await item.load();
-        return { item, hash: await sha256(blob), blob };
-      });
-      const byId = new Map(prepared.map((p, i) => [String(start + i), p]));
+    for (let start = 0; start < files.length; start += BATCH) {
+      const chunk = files.slice(start, start + BATCH);
+      const hashed = await mapLimit(chunk, PARALLEL, async (file) => ({ file, hash: await sha256(file) }));
+      const byId = new Map(hashed.map((h, i) => [String(start + i), h.file]));
       const res = await post<{ albumId: string | null; items: UploadItem[]; usage: Usage }>("/api/uploads", {
         collectionId,
         albumId,
         albumName,
-        origin,
-        files: prepared.map((p, i) => ({
-          clientId: String(start + i),
-          name: p.item.name,
-          size: p.item.size,
-          type: p.item.type,
-          sha256: p.hash,
-          externalRef: p.item.externalRef ?? null,
-        })),
+        files: hashed.map((h, i) => ({ clientId: String(start + i), name: h.file.name, size: h.file.size, type: h.file.type, sha256: h.hash })),
       });
       albumId = res.albumId;
       albumName = null;
@@ -159,18 +135,15 @@ export function Uploader({
         done: res.items.length - toSend.length,
       });
 
-      let authError: unknown = null;
       const sent = await mapLimit(toSend, PARALLEL, async (it) => {
-        const p = byId.get(it.clientId)!;
+        const file = byId.get(it.clientId)!;
         try {
-          const body = p.blob ?? (await p.item.load());
-          const put = await fetch(it.upload!.url, { method: "PUT", headers: it.upload!.headers, body });
-          return put.ok ? it.photoId! : null;
-        } catch (err) {
-          if (err instanceof DriveAuthError) authError = err;
-          return null;
-        } finally {
+          const put = await fetch(it.upload!.url, { method: "PUT", headers: it.upload!.headers, body: file });
           bump({ done: 1 });
+          return put.ok ? it.photoId! : null;
+        } catch {
+          bump({ done: 1 });
+          return null;
         }
       });
       const ok = sent.filter((id): id is string => Boolean(id));
@@ -181,81 +154,37 @@ export function Uploader({
       } else {
         bump({ failed: failedPut });
       }
-      if (authError) throw authError;
     }
-  }
-
-  function destinationTarget() {
-    if (destination === "__new" && !newAlbum.trim()) {
-      setError("Dê um nome ao novo álbum ou escolha outro destino.");
-      return null;
-    }
-    return destination === "__new" ? { albumName: newAlbum.trim() } : { albumId: destination || null };
-  }
-
-  function finish() {
-    setBusy(false);
-    setPhase(null);
-    if (filesRef.current) filesRef.current.value = "";
-    if (folderRef.current) folderRef.current.value = "";
-    setNewAlbum("");
-    router.refresh();
   }
 
   async function start(list: FileList | File[] | null) {
     const all = Array.from(list ?? []);
     if (all.length === 0 || busy) return;
-    const fallback = destinationTarget();
-    if (!fallback) return;
-    const valid = all.filter(acceptable);
+    if (destination === "__new" && !newAlbum.trim()) {
+      setError("Dê um nome ao novo álbum ou escolha outro destino.");
+      return;
+    }
+    const valid = all.filter((f) => ACCEPTED.includes(f.type) && f.size > 0 && f.size <= MAX_BYTES);
     setError(null);
     setBusy(true);
     setTally({ ...empty, total: all.length, invalid: all.length - valid.length, done: all.length - valid.length });
 
-    const groups = new Map<string, Item[]>();
+    const fallback = destination === "__new" ? { albumName: newAlbum.trim() } : { albumId: destination || null };
+    const groups = new Map<string, File[]>();
     for (const f of valid) {
       const key = folderOf(f) ?? "";
-      groups.set(key, [...(groups.get(key) ?? []), { name: f.name, size: f.size, type: f.type, load: async () => f }]);
+      groups.set(key, [...(groups.get(key) ?? []), f]);
     }
     try {
-      for (const [folder, items] of groups) await sendGroup(items, folder ? { albumName: folder } : fallback);
+      for (const [folder, files] of groups) await sendGroup(files, folder ? { albumName: folder } : fallback);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível enviar agora. Tente de novo.");
     } finally {
-      finish();
-    }
-  }
-
-  async function startDrive() {
-    if (busy) return;
-    const target = destinationTarget();
-    if (!target) return;
-    setError(null);
-    setTally(null);
-    setBusy(true);
-    setPhase("Abrindo o Google Drive…");
-    try {
-      const { token, files } = await chooseFromDrive();
-      if (files.length === 0) return;
-      setPhase(`Lendo ${formatNumber(files.length)} ${files.length === 1 ? "arquivo escolhido" : "arquivos escolhidos"}…`);
-      const meta = await mapLimit(files, 6, (f) => driveMetadata(token, f.id, f));
-      const valid = meta.filter((m) => acceptable({ type: m.mimeType, size: m.size }));
-      setPhase(null);
-      setTally({ ...empty, total: meta.length, invalid: meta.length - valid.length, done: meta.length - valid.length });
-      const items: Item[] = valid.map((m) => ({
-        name: m.name,
-        size: m.size,
-        type: m.mimeType,
-        externalRef: m.id,
-        hash: m.sha256,
-        load: () => driveDownload(token, m.id),
-      }));
-      // Lotes menores: as fotos do Drive passam pela memória do navegador até chegarem ao armazenamento.
-      await sendGroup(items, target, "google_drive", 20);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível importar agora. Tente de novo.");
-    } finally {
-      finish();
+      setBusy(false);
+      if (filesRef.current) filesRef.current.value = "";
+      if (folderRef.current) folderRef.current.value = "";
+      setNewAlbum("");
+      router.refresh();
     }
   }
 
@@ -322,11 +251,6 @@ export function Uploader({
           <Button variant="secondary" icon={<FolderUp size={16} aria-hidden />} onClick={() => folderRef.current?.click()} disabled={busy || full}>
             Enviar uma pasta
           </Button>
-          {driveConfigured && (
-            <Button variant="secondary" icon={<HardDrive size={16} aria-hidden />} onClick={startDrive} disabled={busy || full}>
-              Importar do Google Drive
-            </Button>
-          )}
         </div>
         <p className="text-xs text-nf-subtle">Cada pasta enviada vira um álbum com o nome dela. Fotos repetidas não são enviadas de novo.</p>
         <input ref={filesRef} type="file" accept={ACCEPTED.join(",")} multiple className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => start(e.target.files)} />
@@ -346,12 +270,6 @@ export function Uploader({
         <p role="alert" className="mt-4 flex items-start gap-2 rounded-nf bg-nf-danger-soft px-3.5 py-3 text-sm text-nf-danger">
           <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden />
           {error}
-        </p>
-      )}
-
-      {phase && (
-        <p className="mt-5 flex items-center gap-2 text-sm font-medium text-nf-text" aria-live="polite">
-          <Loader2 size={16} className="animate-spin" aria-hidden /> {phase}
         </p>
       )}
 
