@@ -13,7 +13,10 @@ if (!url) {
 const sql = postgres(url, { max: 1, onnotice: () => {} });
 try {
   await migrate(drizzle({ client: sql }), { migrationsFolder: new URL("../drizzle", import.meta.url).pathname });
-  console.log("[migrate] Banco atualizado.");
+  // Só o host aparece no log do build, nunca usuário ou senha.
+  let host = "banco";
+  try { host = new URL(url).host; } catch {}
+  console.log(`[migrate] Banco atualizado (${host}).`);
 } finally {
   await sql.end();
 }
