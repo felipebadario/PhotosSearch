@@ -112,10 +112,7 @@ export default async function Home() {
         {/* Hero */}
         <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-10 sm:px-8 sm:pt-16 lg:grid-cols-[1.15fr_1fr] lg:pb-24">
           <div className="animate-nf-rise">
-            <p className="inline-flex items-center gap-2 rounded-full border border-nf-line bg-nf-surface px-3 py-1.5 text-xs font-medium text-nf-muted">
-              <span className="h-1.5 w-1.5 rounded-full bg-nf-accent" aria-hidden /> Para igrejas, escolas, eventos, fotógrafos e empresas
-            </p>
-            <h1 className="mt-6 text-[40px] font-semibold leading-[1.05] tracking-[-0.03em] text-nf-text sm:text-6xl">
+            <h1 className="text-[40px] font-semibold leading-[1.05] tracking-[-0.03em] text-nf-text sm:text-6xl">
               Você esteve lá.
               <br />
               Agora encontre as suas fotos.
