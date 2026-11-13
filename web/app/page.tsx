@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 const features = [
   { icon: ImageUp, title: "Envio direto", text: "Arraste centenas de fotos de uma vez. Se mandar de novo, as que já estão lá são puladas." },
   { icon: FolderSync, title: "Pastas do Google Drive", text: "Cole o link de uma pasta compartilhada. Cada subpasta vira um álbum e as novas fotos chegam sozinhas." },
-  { icon: Images, title: "Álbuns", text: "Separe culto, cerimônia, festa ou turma. Quem busca pode navegar por álbum." },
+  { icon: Images, title: "Álbuns", text: "Separe culto, cerimônia, festa ou turma, e encontre qualquer foto rápido no Admin." },
   { icon: Copy, title: "Fotos repetidas contam uma vez", text: "A mesma foto em vários acervos ocupa um lugar só no seu plano." },
   { icon: CalendarClock, title: "Eventos com prazo", text: "Defina até quando a página fica aberta. Depois disso, ela encerra sozinha." },
   { icon: QrCode, title: "Link e QR Code", text: "Gere o QR Code em um clique e baixe para o telão, o convite ou o crachá." },
@@ -52,6 +52,7 @@ const features = [
 
 const privacy = [
   { icon: ScanFace, title: "A selfie não fica guardada", text: "Ela serve só para aquela busca e é descartada em seguida." },
+  { icon: Users, title: "Cada pessoa vê só as próprias fotos", text: "Quem abre o link não vê a galeria do evento. Só aparecem as fotos em que a selfie encontrou a pessoa." },
   { icon: Lock, title: "A busca fica dentro do acervo", text: "Ninguém procura um rosto em todo o NossaFoto, só nas fotos daquele evento ou acervo." },
   { icon: EyeOff, title: "Fora dos buscadores", text: "As páginas de fotos não aparecem no Google. Só chega quem tem o link ou o QR Code." },
   { icon: Timer, title: "Prazo para acabar", text: "Eventos encerram na data definida, e você pode fechar o link quando quiser." },
@@ -66,6 +67,10 @@ const faq = [
   {
     q: "Quem participa paga alguma coisa?",
     a: "Nunca. Quem paga é a organização que guarda as fotos, pelo volume de fotos (Business) ou por evento (Events).",
+  },
+  {
+    q: "Quem abre o link vê todas as fotos do evento?",
+    a: "Não. A página do link não mostra a galeria. Cada pessoa tira uma selfie e vê só as fotos em que aparece. A galeria completa fica com a equipe da organização.",
   },
   {
     q: "O que acontece com a selfie?",
@@ -236,8 +241,8 @@ export default async function Home() {
               {privacy.map((p, i) => {
                 const Icon = p.icon;
                 return (
-                  <li key={p.title} className={i === 0 ? "rounded-nf-lg border border-nf-accent/25 bg-nf-accent-soft/50 p-5 sm:col-span-2" : "rounded-nf-lg border border-nf-line bg-nf-surface p-5"}>
-                    <Icon size={18} className={i === 0 ? "text-nf-accent" : "text-nf-muted"} aria-hidden />
+                  <li key={p.title} className={i < 2 ? "rounded-nf-lg border border-nf-accent/25 bg-nf-accent-soft/50 p-5 sm:col-span-2" : "rounded-nf-lg border border-nf-line bg-nf-surface p-5"}>
+                    <Icon size={18} className={i < 2 ? "text-nf-accent" : "text-nf-muted"} aria-hidden />
                     <h3 className="mt-3 font-semibold text-nf-text">{p.title}</h3>
                     <p className="mt-1 text-sm text-nf-muted">{p.text}</p>
                   </li>
