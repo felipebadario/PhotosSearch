@@ -219,3 +219,39 @@ export type Album = typeof albums.$inferSelect;
 export type Photo = typeof photos.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
 export type DriveSource = typeof driveSources.$inferSelect;
+
+// ── Interessados em assinar (CRM simples da equipe NossaFoto) ──
+
+export const leadStatus = pgEnum("lead_status", ["new", "contacted", "proposal", "won", "lost"]);
+
+/**
+ * Quem pediu para assinar. Não é dado de cliente de uma organização: é da equipe
+ * do NossaFoto, que conduz a conversa até o pagamento. organization_id é só o
+ * contexto de quem pediu já logado (uso e plano na hora do pedido).
+ */
+export const leads = pgTable(
+  "leads",
+  {
+    id: text("id").primaryKey().default(sql`gen_random_uuid()::text`),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    phone: text("phone"),
+    organizationName: text("organization_name"),
+    segment: text("segment"),
+    plan: text("plan"),
+    expectedPhotos: text("expected_photos"),
+    message: text("message"),
+    source: text("source").notNull().default("site"), // site | planos | limite | assinatura
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "set null" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    usedPhotos: integer("used_photos"),
+    photoLimit: integer("photo_limit"),
+    status: leadStatus("status").notNull().default("new"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("leads_status_time_idx").on(t.status, t.createdAt), index("leads_email_idx").on(t.email)],
+);
+
+export type Lead = typeof leads.$inferSelect;

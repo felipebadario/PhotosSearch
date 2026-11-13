@@ -130,8 +130,16 @@ export function PlanEstimator() {
           <p className="mt-1 text-sm text-white/75">Quem procura as próprias fotos não paga nada, não importa quantas pessoas sejam.</p>
         </div>
         <div className="mt-auto pt-8">
-          <p className="text-sm text-white/75">O NossaFoto está em fase de testes: criar a conta da organização não tem custo. Os valores dos planos saem em breve.</p>
-          <Button href="/criar-conta" variant="secondary" size="lg" className="mt-4 w-full border-transparent">
+          <p className="text-sm text-white/75">Comece sem custo com até 1.000 fotos. Quando quiser mais, nossa equipe monta o plano com você.</p>
+          <Button
+            href={`/assinar?origem=planos&plano=${mode === "events" ? "events" : tier.name.toLowerCase()}`}
+            variant="secondary"
+            size="lg"
+            className="mt-4 w-full border-transparent"
+          >
+            Quero assinar
+          </Button>
+          <Button href="/criar-conta" size="lg" className="mt-2 w-full bg-white/10 hover:bg-white/15">
             Começar sem custo
           </Button>
         </div>

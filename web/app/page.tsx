@@ -90,7 +90,7 @@ const faq = [
   },
   {
     q: "Quanto custa?",
-    a: "Durante a fase de testes, criar a conta da organização não tem custo. Os valores dos planos Business e Events serão anunciados em breve.",
+    a: "Criar a conta da organização não tem custo e já dá para guardar até 1.000 fotos. Para ir além, peça a assinatura em nossafoto.app/assinar e nossa equipe monta o plano com você.",
   },
 ];
 
@@ -309,6 +309,7 @@ export default async function Home() {
           <nav aria-label="Rodapé" className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-nf-muted">
             <a href="#como-funciona" className="hover:text-nf-text">Como funciona</a>
             <a href="#planos" className="hover:text-nf-text">Planos</a>
+            <Link href="/assinar" className="hover:text-nf-text">Assinar</Link>
             <a href="https://instagram.com/nossafoto.app" target="_blank" rel="noopener noreferrer" className="hover:text-nf-text">Instagram</a>
             <Link href="/entrar" className="hover:text-nf-text">Entrar</Link>
           </nav>

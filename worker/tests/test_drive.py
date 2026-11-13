@@ -137,6 +137,47 @@ def test_respeita_a_franquia(conn, org, storage, tree):
     conn.commit()
 
 
+def test_sem_assinatura_vale_a_avaliacao_de_1000_fotos(conn, org):
+    assert drive.photo_limit(conn, org["id"]) == 1000
+
+
+def test_franquia_cheia_nao_desfaz_album_de_foto_repetida(conn, org, storage, tree):
+    """Depois que a franquia enche, uma foto que já existe ainda entra no álbum da subpasta."""
+    plan = f"t2-{org['run']}"
+    conn.execute("insert into plans (id, kind, name, photo_limit) values (%s, 'business', 'Teste', 2)", (plan,))
+    conn.execute("insert into subscriptions (organization_id, plan_id) values (%s, %s)", (org["id"], plan))
+    # Com o checksum do Drive, dá para reconhecer a foto repetida sem baixar.
+    tree = FakeDrive(
+        {
+            "raiz": [img("a", "a.jpg", sha=True, contents=tree.contents), {"id": "sub", "name": "Culto de domingo", "mimeType": "application/vnd.google-apps.folder"}],
+            "sub": [img("b", "b.jpg", sha=True, contents=tree.contents), img("c", "c.png", sha=True, contents=tree.contents, mime="image/png")],
+        },
+        tree.contents,
+    )
+    sha_c = hashlib.sha256(tree.contents["c"]).hexdigest()
+    conn.execute(
+        "insert into photos (organization_id, content_hash, storage_key, status) values (%s, %s, 'x', 'indexed')", (org["id"], sha_c)
+    )
+    conn.commit()
+    sid = add_source(conn, org)
+    drive.run_once(conn, tree, storage)
+    status, error, *_ = source_row(conn, sid)
+    assert status == "error" and "franquia" in error
+    row = conn.execute(
+        """
+        select a.name from collection_photos cp join photos p on p.id = cp.photo_id join albums a on a.id = cp.album_id
+        where cp.collection_id = %s and p.content_hash = %s
+        """,
+        (org["collection"], sha_c),
+    ).fetchone()
+    assert row and row[0] == "Culto de domingo"
+    used = conn.execute("select count(*) from photos where organization_id = %s and status <> 'error'", (org["id"],)).fetchone()[0]
+    assert used == 2
+    conn.execute("delete from subscriptions where organization_id = %s", (org["id"],))
+    conn.execute("delete from plans where id = %s", (plan,))
+    conn.commit()
+
+
 def test_fotos_da_pasta_sao_indexadas(conn, org, storage, tree, engine):
     from nfworker import indexer
 

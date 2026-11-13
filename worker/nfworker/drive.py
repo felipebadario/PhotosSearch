@@ -181,6 +181,9 @@ def album_id(conn, cache: dict, org_id: str, collection_id: str, name: str | Non
         row = conn.execute(
             "insert into albums (organization_id, collection_id, name) values (%s, %s, %s) returning id", (org_id, collection_id, name)
         ).fetchone()
+        # Grava já: um rollback depois (franquia cheia, falha no download) não pode
+        # desfazer o álbum que fica guardado no cache e quebrar as próximas fotos.
+        conn.commit()
     cache[name] = row[0]
     return row[0]
 
