@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { Logo } from "@/components/brand/Logo";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
-import { updateLeadAction } from "@/lib/actions/leads";
+import { updateLeadAction } from "@/lib/actions/manager";
+import { PageTitle, whatsappUrl } from "@/components/manager/shared";
+import { managerBase } from "@/lib/server/manager";
 import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/format";
 import { db } from "@/lib/server/db";
@@ -13,50 +13,31 @@ import {
   LEAD_STATUSES,
   LEAD_STATUS_LABEL,
   countLeadsByStatus,
-  isTeamEmail,
   listLeads,
   type LeadStatus,
 } from "@/lib/server/repos/leads";
-import { getSession } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Pedidos de assinatura", robots: { index: false } };
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Pedidos de assinatura" };
 
 const SOURCE_LABEL: Record<string, string> = { site: "Site", planos: "Seção de planos", limite: "Bateu o limite", assinatura: "Tela de assinatura" };
 const fmt = (d: Date) => new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(d);
-const whatsapp = (phone: string) => {
-  const digits = phone.replace(/\D/g, "");
-  return `https://wa.me/${digits.length <= 11 ? `55${digits}` : digits}`;
-};
 
 /** CRM simples da equipe NossaFoto: quem pediu para assinar e em que pé está a conversa. */
-export default async function LeadsPage({ searchParams }: PageProps<"/equipe/leads">) {
-  const session = await getSession();
-  if (!session) redirect("/entrar");
-  if (!isTeamEmail(session.user.email)) notFound();
-
+export default async function LeadsPage({ searchParams }: PageProps<"/manager/pedidos">) {
   const { status } = await searchParams;
   const filter = (LEAD_STATUSES as readonly string[]).includes(String(status)) ? (status as LeadStatus) : null;
-  const [rows, counts] = await Promise.all([listLeads(db, { status: filter }), countLeadsByStatus(db)]);
+  const [base, rows, counts] = await Promise.all([managerBase(), listLeads(db, { status: filter }), countLeadsByStatus(db)]);
+  const href = (p: string) => `${base}${p}`;
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="min-h-screen bg-nf-canvas">
-      <header className="flex items-center justify-between px-5 py-5 sm:px-8">
-        <Link href="/painel" aria-label="Voltar ao painel" className="inline-flex rounded-nf">
-          <Logo size={28} />
-        </Link>
-        <span className="text-sm text-nf-muted">Equipe NossaFoto</span>
-      </header>
-      <main id="conteudo" className="mx-auto max-w-5xl px-4 pb-16 sm:px-8">
-        <h1 className="text-2xl font-semibold text-nf-text">Pedidos de assinatura</h1>
-        <p className="mt-1.5 text-[15px] text-nf-muted">Quem pediu para assinar pelo site ou ao bater o limite. Mude o status conforme a conversa anda.</p>
-
+    <>
+      <PageTitle title="Pedidos de assinatura" description="Quem pediu para assinar pelo site ou ao bater o limite. Mude o status conforme a conversa anda." />
         <nav aria-label="Filtrar por status" className="mt-6 flex flex-wrap gap-2">
           {[{ key: null, label: "Todos", n: total }, ...LEAD_STATUSES.map((s) => ({ key: s, label: LEAD_STATUS_LABEL[s], n: counts[s] }))].map((f) => (
             <Link
               key={f.key ?? "todos"}
-              href={f.key ? `/equipe/leads?status=${f.key}` : "/equipe/leads"}
+              href={href(f.key ? `/pedidos?status=${f.key}` : "/pedidos")}
               aria-current={filter === f.key ? "page" : undefined}
               className={cn(
                 "rounded-full border px-3.5 py-1.5 text-sm",
@@ -73,7 +54,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/equipe/lea
         ) : (
           <ul className="mt-6 space-y-3">
             {rows.map((l) => (
-              <li key={l.id}>
+              <li key={l.id} id={l.id} className="scroll-mt-24">
                 <Card className="p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -84,7 +65,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/equipe/lea
                       <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
                         <a href={`mailto:${l.email}`} className="text-nf-accent underline-offset-2 hover:underline">{l.email}</a>
                         {l.phone && (
-                          <a href={whatsapp(l.phone)} target="_blank" rel="noopener noreferrer" className="text-nf-accent underline-offset-2 hover:underline">
+                          <a href={whatsappUrl(l.phone)} target="_blank" rel="noopener noreferrer" className="text-nf-accent underline-offset-2 hover:underline">
                             WhatsApp {l.phone}
                           </a>
                         )}
@@ -96,13 +77,14 @@ export default async function LeadsPage({ searchParams }: PageProps<"/equipe/lea
                     </div>
                   </div>
                   <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-                    {[
+                    {([
                       ["Plano", l.plan ? (LEAD_PLAN_LABEL as Record<string, string>)[l.plan] ?? l.plan : null],
                       ["Volume", l.expectedPhotos],
                       ["Tipo", l.segment],
                       ["Origem", SOURCE_LABEL[l.source] ?? l.source],
+                      ["Organização no app", l.organizationId ? <Link key="o" href={href(`/organizacoes/${l.organizationId}`)} className="text-nf-accent hover:underline">abrir</Link> : null],
                       ["Uso atual", l.usedPhotos != null ? `${formatNumber(l.usedPhotos)}${l.photoLimit != null ? ` de ${formatNumber(l.photoLimit)}` : ""} fotos (já tem conta)` : null],
-                    ]
+                    ] as [string, React.ReactNode][])
                       .filter(([, v]) => v)
                       .map(([k, v]) => (
                         <div key={k} className="flex gap-2">
@@ -143,7 +125,6 @@ export default async function LeadsPage({ searchParams }: PageProps<"/equipe/lea
             ))}
           </ul>
         )}
-      </main>
-    </div>
+    </>
   );
 }

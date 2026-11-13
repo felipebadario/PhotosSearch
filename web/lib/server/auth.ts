@@ -15,7 +15,7 @@ const vercelUrls = [process.env.VERCEL_BRANCH_URL, process.env.VERCEL_URL, proce
 export const auth = betterAuth({
   appName: "NossaFoto",
   baseURL: process.env.BETTER_AUTH_URL ?? vercelUrls[0],
-  trustedOrigins: ["https://nossafoto.app", "https://www.nossafoto.app", ...vercelUrls],
+  trustedOrigins: ["https://nossafoto.app", "https://www.nossafoto.app", "https://manager.nossafoto.app", ...vercelUrls],
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: {
     enabled: true,

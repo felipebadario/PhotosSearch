@@ -21,6 +21,8 @@ const nextConfig: NextConfig = {
       to("/conta/assinatura", "/assinatura"),
       to("/conta/consumo", "/assinatura"),
       to("/conta/privacidade", "/configuracoes"),
+      // A lista de pedidos foi para a área da equipe (manager.nossafoto.app).
+      to("/equipe/:path*", "/manager/pedidos"),
     ];
   },
 };
