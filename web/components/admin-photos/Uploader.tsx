@@ -261,7 +261,7 @@ export function Uploader({
         <p role="alert" className="mt-4 flex items-start gap-2 rounded-nf bg-nf-warning-soft px-3.5 py-3 text-sm text-nf-warning">
           <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden />
           <span>
-            O plano chegou ao limite de fotos. <Link href="/assinatura" className="font-medium underline">Veja como ampliar</Link>.
+            O plano chegou ao limite de fotos. <Link href="/assinar?origem=limite" className="font-medium underline">Quero ampliar o plano</Link>.
           </span>
         </p>
       )}
@@ -290,7 +290,7 @@ export function Uploader({
               {tally.quota > 0 && (
                 <li className="text-nf-warning">
                   {plural(tally.quota, "foto ficou de fora porque o plano chegou ao limite", "fotos ficaram de fora porque o plano chegou ao limite")}.{" "}
-                  <Link href="/assinatura" className="font-medium underline">Ampliar o plano</Link>
+                  <Link href="/assinar?origem=limite" className="font-medium underline">Quero ampliar o plano</Link>
                 </li>
               )}
               {tally.failed > 0 && <li className="text-nf-danger">{plural(tally.failed, "foto não chegou. Envie de novo", "fotos não chegaram. Envie de novo")}</li>}

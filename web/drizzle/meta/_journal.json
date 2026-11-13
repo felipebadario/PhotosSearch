@@ -36,6 +36,13 @@
       "when": 1794500020970,
       "tag": "0004_capas",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794593951273,
+      "tag": "0005_leads",
+      "breakpoints": true
     }
   ]
 }

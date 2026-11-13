@@ -1,4 +1,5 @@
 import { AlertCircle, CheckCircle2, ExternalLink, HardDrive, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { removeDriveSourceAction, syncDriveSourceAction } from "@/lib/actions/drive";
 import { formatNumber } from "@/lib/format";
@@ -18,7 +19,15 @@ function StatusLine({ s }: { s: DriveSource }) {
   if (s.status === "error")
     return (
       <p className="flex items-start gap-2 text-sm text-nf-danger">
-        <AlertCircle size={15} className="mt-0.5 shrink-0" aria-hidden /> {s.lastError ?? "Não foi possível ler a pasta."}
+        <AlertCircle size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>
+          {s.lastError ?? "Não foi possível ler a pasta."}
+          {s.lastError?.includes("franquia") && (
+            <>
+              {" "}
+              <Link href="/assinar?origem=limite" className="font-medium underline">Quero ampliar o plano</Link>
+            </>
+          )}
+        </span>
       </p>
     );
   if (s.status === "pending" || s.status === "syncing")

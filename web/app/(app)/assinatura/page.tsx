@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
+import Link from "next/link";
+import { Button } from "@/components/ui/Button";
 import { UsageMeter } from "@/components/admin-photos/UsageMeter";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -31,7 +33,7 @@ export default async function AssinaturaPage() {
         </div>
         <p className="mt-4 text-sm text-nf-muted">
           Cada foto conta uma vez, mesmo que esteja em vários acervos. Excluir uma foto de todos os acervos libera o espaço na hora.
-          {usage.planId === "trial" && " Sem cobrança enquanto o NossaFoto está em fase de testes."}
+          {usage.planId === "trial" && usage.limit != null && ` O plano de avaliação não tem custo e vai até ${formatNumber(usage.limit)} fotos.`}
         </p>
       </Card>
 
@@ -44,11 +46,19 @@ export default async function AssinaturaPage() {
                 <p className="font-semibold text-nf-text">{p.name}</p>
                 <p className="mt-1 text-sm text-nf-muted">{p.photoLimit ? `Até ${formatNumber(p.photoLimit)} fotos` : "Volume personalizado"}</p>
                 <p className="mt-3 text-sm font-medium text-nf-text">{price(p.priceCents)}</p>
+                {p.id !== usage.planId && (
+                  <Link href={`/assinar?origem=assinatura&plano=${p.id}`} className="mt-3 inline-block text-sm font-medium text-nf-accent underline-offset-2 hover:underline">
+                    Quero este plano
+                  </Link>
+                )}
               </Card>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-sm text-nf-muted">A contratação pelo app chega numa próxima etapa. Para mudar de plano agora, fale com a gente.</p>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Button href="/assinar?origem=assinatura">Quero assinar</Button>
+          <p className="text-sm text-nf-muted">Nossa equipe fala com você para montar o plano e combinar o pagamento.</p>
+        </div>
       </section>
     </div>
   );

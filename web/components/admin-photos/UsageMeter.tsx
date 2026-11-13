@@ -22,7 +22,9 @@ export function UsageMeter({ used, limit, planName, showLink = false }: { used: 
       {near && (
         <p className="mt-2 text-sm text-nf-warning">
           {used >= limit! ? "O plano chegou ao limite: novas fotos ficam de fora." : "O plano está perto do limite."}{" "}
-          {showLink && <Link href="/assinatura" className="font-medium underline">Ver planos</Link>}
+          <Link href={showLink ? "/assinatura" : "/assinar?origem=limite"} className="font-medium underline">
+            {showLink ? "Ver planos" : "Quero ampliar o plano"}
+          </Link>
         </p>
       )}
     </div>
