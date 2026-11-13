@@ -1,12 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/lib/server/db";
-import { createLead, isTeamEmail, updateLead } from "@/lib/server/repos/leads";
+import { createLead } from "@/lib/server/repos/leads";
 import { ValidationError } from "@/lib/server/repos/collections";
 import { getUsage } from "@/lib/server/repos/photos";
-import { getSession, getTenant } from "@/lib/server/session";
+import { getTenant } from "@/lib/server/session";
 
 export type LeadFormState = { error?: string; ok?: boolean; values?: Record<string, string> };
 
@@ -45,19 +44,4 @@ export async function submitLeadAction(_prev: LeadFormState, form: FormData): Pr
     return { error: "Não foi possível enviar agora. Tente de novo em instantes.", values };
   }
   return { ok: true };
-}
-
-async function requireTeam() {
-  const session = await getSession();
-  if (!session || !isTeamEmail(session.user.email)) throw new Error("Acesso restrito à equipe.");
-}
-
-export async function updateLeadAction(form: FormData) {
-  await requireTeam();
-  const id = text(form, "id");
-  const patch: { status?: string; notes?: string } = {};
-  if (form.has("status")) patch.status = text(form, "status");
-  if (form.has("notes")) patch.notes = text(form, "notes");
-  await updateLead(db, id, patch);
-  revalidatePath("/equipe/leads");
 }
