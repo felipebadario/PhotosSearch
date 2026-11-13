@@ -7,7 +7,7 @@ import { PhotoGrid } from "@/components/photos/PhotoGrid";
 import { plural } from "@/lib/format";
 import type { GalleryPhoto } from "@/lib/types";
 
-type Result = { photos: { id: string; albumName: string | null; takenAt: string | null }[]; pending: number; searchable: number };
+type Result = { photos: { id: string; token: string; albumName: string | null; takenAt: string | null }[]; pending: number; searchable: number };
 
 const MAX_SIDE = 1280;
 
@@ -60,13 +60,13 @@ export function FaceSearch({ orgSlug, collectionSlug, allowDownload }: { orgSlug
     }
   }
 
-  const photoUrl = (id: string) => `${base}/fotos/${id}`;
+  const photoUrl = (id: string, token: string) => `${base}/fotos/${id}?t=${encodeURIComponent(token)}`;
   const gallery: GalleryPhoto[] =
     result?.photos.map((p) => ({
       id: p.id,
-      url: photoUrl(p.id),
-      thumbnailUrl: photoUrl(p.id),
-      downloadUrl: `${photoUrl(p.id)}?baixar=1`,
+      url: photoUrl(p.id, p.token),
+      thumbnailUrl: photoUrl(p.id, p.token),
+      downloadUrl: `${photoUrl(p.id, p.token)}&baixar=1`,
       albumName: p.albumName,
       source: "upload",
       takenAt: p.takenAt,

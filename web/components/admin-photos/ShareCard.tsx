@@ -44,7 +44,7 @@ export async function ShareCard({
         <div className="mt-3">
           <p className="flex items-start gap-2 text-sm text-nf-muted">
             <Lock size={16} className="mt-0.5 shrink-0" aria-hidden />
-            Só os membros da organização veem estas fotos. Ao abrir por link, quem tiver o link ou o QR Code vê todas as fotos deste acervo, sem precisar de conta.
+            Só os membros da organização veem estas fotos. Ao abrir por link, quem tiver o link ou o QR Code busca com uma selfie e vê só as fotos em que aparece, sem precisar de conta.
           </p>
           {canEdit && (
             <form action={setSharingAction} className="mt-4">
@@ -64,7 +64,7 @@ export async function ShareCard({
             <p className="text-sm text-nf-muted">
               {closed
                 ? "O evento passou do prazo de disponibilidade: quem abrir o link vê o aviso de encerrado, sem fotos."
-                : "Quem abrir este link ou apontar a câmera para o QR Code vê todas as fotos deste acervo, sem precisar de conta."}
+                : "Quem abrir este link ou apontar a câmera para o QR Code tira uma selfie e vê só as fotos em que aparece. A galeria completa fica só com a sua equipe."}
             </p>
             <p className="flex items-center gap-2 break-all rounded-nf bg-nf-sunken px-3 py-2.5 text-sm text-nf-text">
               <Link2 size={15} className="shrink-0 text-nf-muted" aria-hidden />

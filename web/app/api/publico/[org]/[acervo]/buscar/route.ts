@@ -1,6 +1,7 @@
 import { db } from "@/lib/server/db";
 import { json, sameOrigin } from "@/lib/server/http";
 import { getPublicCollection, getPublicPhotosByIds, logSearch, recentSearchCount, searchReadiness } from "@/lib/server/repos/public";
+import { createPhotoToken } from "@/lib/server/public-photo-token";
 import { SelfieError, searchSelfie, workerConfigured } from "@/lib/server/worker";
 
 const MAX_SELFIE_BYTES = 4 * 1024 * 1024; // o navegador reduz a selfie antes de enviar
@@ -51,7 +52,7 @@ export async function POST(req: Request, route: RouteContext<"/api/publico/[org]
     const byId = new Map(rows.map((r) => [r.id, r]));
     const photos = matches.flatMap((m) => {
       const r = byId.get(m.photo_id);
-      return r ? [{ id: r.id, albumName: r.albumName, takenAt: r.takenAt ? r.takenAt.toISOString() : null }] : [];
+      return r ? [{ id: r.id, token: createPhotoToken(collection.id, r.id), albumName: r.albumName, takenAt: r.takenAt ? r.takenAt.toISOString() : null }] : [];
     });
     await logSearch(db, collection, photos.length);
     const ready = await searchReadiness(db, collection);
