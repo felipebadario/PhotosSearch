@@ -1,24 +1,21 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { CalendarDays, ChevronRight, FolderOpen, Library, Plus } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
+import { FolderOpen, Plus } from "lucide-react";
+import { CollectionBrowser } from "@/components/collections/CollectionBrowser";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { collectionStatus } from "@/lib/collection-status";
-import { formatDay } from "@/lib/format";
-import { collectionKindLabel } from "@/lib/labels";
+import { toCollectionCard } from "@/lib/collection-cards";
 import { db } from "@/lib/server/db";
 import { can } from "@/lib/server/permissions";
 import { listCollections } from "@/lib/server/repos/collections";
+import { getCollectionsOverview } from "@/lib/server/repos/photos";
 import { requireAdmin } from "@/lib/server/session";
 
 export const metadata: Metadata = { title: "Acervos e eventos" };
 
 export default async function AcervosPage() {
   const ctx = await requireAdmin();
-  const items = await listCollections(db, ctx);
+  const [items, overview] = await Promise.all([listCollections(db, ctx), getCollectionsOverview(db, ctx)]);
   const canCreate = can(ctx.role, { collection: ["create"] });
 
   return (
@@ -43,33 +40,7 @@ export default async function AcervosPage() {
           action={canCreate && <Button href="/acervos/novo">Criar o primeiro</Button>}
         />
       ) : (
-        <Card className="divide-y divide-nf-line">
-          {items.map((c) => {
-            const status = collectionStatus(c);
-            const Icon = c.kind === "event" ? CalendarDays : Library;
-            return (
-              <Link
-                key={c.id}
-                href={`/acervos/${c.id}`}
-                className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-nf-sunken/60 sm:px-5"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-nf bg-nf-sunken text-nf-muted">
-                  <Icon size={18} aria-hidden />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-nf-text">{c.name}</span>
-                  <span className="block truncate text-sm text-nf-muted">
-                    {c.kind === "event" ? `${formatDay(c.startsAt)} a ${formatDay(c.endsAt)}` : collectionKindLabel(c.kind)}
-                  </span>
-                </span>
-                <Badge tone={status.tone} className="hidden sm:inline-flex">
-                  {status.label}
-                </Badge>
-                <ChevronRight size={18} className="text-nf-subtle" aria-hidden />
-              </Link>
-            );
-          })}
-        </Card>
+        <CollectionBrowser items={items.map((c) => toCollectionCard(c, overview.get(c.id)))} />
       )}
     </div>
   );

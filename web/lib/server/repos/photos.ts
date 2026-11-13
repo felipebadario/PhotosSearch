@@ -435,3 +435,53 @@ export async function retryFailedPhotos(db: Db, ctx: TenantContext, collectionId
     .returning({ id: photos.id });
   return res.length;
 }
+
+// ── Visão geral dos acervos (Painel e lista de acervos) ──
+
+export type CollectionOverview = { photos: number; indexed: number; pending: number; failed: number; recent: string[] };
+
+/**
+ * Números e até `thumbs` fotos recentes de cada acervo da organização, em duas
+ * consultas (sem N+1). Fotos ainda chegando ("uploading") ficam de fora.
+ */
+export async function getCollectionsOverview(db: Db, ctx: TenantContext, thumbs = 4) {
+  const scope = and(eq(collectionPhotos.organizationId, ctx.organizationId), ne(photos.status, "uploading"));
+  const join = and(eq(photos.id, collectionPhotos.photoId), eq(photos.organizationId, ctx.organizationId));
+  const counts = await db
+    .select({ collectionId: collectionPhotos.collectionId, status: photos.status, n: count() })
+    .from(collectionPhotos)
+    .innerJoin(photos, join)
+    .where(scope)
+    .groupBy(collectionPhotos.collectionId, photos.status);
+  const ranked = db
+    .select({
+      collectionId: collectionPhotos.collectionId,
+      photoId: photos.id,
+      rn: sql<number>`row_number() over (partition by ${collectionPhotos.collectionId} order by ${collectionPhotos.addedAt} desc, ${photos.id})`.as("rn"),
+    })
+    .from(collectionPhotos)
+    .innerJoin(photos, join)
+    .where(scope)
+    .as("ranked");
+  const recent = await db
+    .select({ collectionId: ranked.collectionId, photoId: ranked.photoId })
+    .from(ranked)
+    .where(sql`${ranked.rn} <= ${thumbs}`)
+    .orderBy(ranked.collectionId, ranked.rn);
+
+  const map = new Map<string, CollectionOverview>();
+  const get = (id: string) => {
+    let o = map.get(id);
+    if (!o) map.set(id, (o = { photos: 0, indexed: 0, pending: 0, failed: 0, recent: [] }));
+    return o;
+  };
+  for (const r of counts) {
+    const o = get(r.collectionId);
+    o.photos += r.n;
+    if (r.status === "indexed") o.indexed += r.n;
+    else if (r.status === "queued" || r.status === "processing") o.pending += r.n;
+    else if (r.status === "error") o.failed += r.n;
+  }
+  for (const r of recent) get(r.collectionId).recent.push(r.photoId);
+  return map;
+}
