@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { isTeamEmail } from "./repos/leads.ts";
 import { getSession } from "./session.ts";
 
-/** "" em manager.nossafoto.app; "/manager" em localhost e nos previews, onde não há subdomínio. */
+/** "/manager" no caminho normal; "" se um dia o subdomínio manager.* for ligado. */
 export async function managerBase() {
   return (await headers()).get("x-nf-manager-host") ? "" : "/manager";
 }

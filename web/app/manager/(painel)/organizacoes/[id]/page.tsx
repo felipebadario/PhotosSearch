@@ -36,7 +36,7 @@ export default async function OrganizacaoPage({ params }: PageProps<"/manager/or
       <Link href={href("/organizacoes")} className="mb-4 inline-flex items-center gap-1.5 text-sm text-nf-muted hover:text-nf-text">
         <ArrowLeft size={14} aria-hidden /> Organizações
       </Link>
-      <PageTitle title={org.name} description={`nossafoto.app/${org.slug} · criada em ${fmtDate(org.createdAt)}`} />
+      <PageTitle title={org.name} description={`Endereço público /${org.slug} · criada em ${fmtDate(org.createdAt)}`} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">

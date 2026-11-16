@@ -16,10 +16,10 @@ export default async function SemAcessoPage() {
         <h1 className="mt-8 text-2xl font-semibold text-nf-text">Esta área é só da equipe NossaFoto</h1>
         <p className="mt-1.5 text-[15px] text-nf-muted">
           {session ? `A conta ${session.user.email} não tem acesso ao Manager.` : "Entre com uma conta da equipe."} Se você usa o NossaFoto na sua
-          organização, o painel fica em nossafoto.app.
+          organização, use o painel dela.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          <Button href="https://nossafoto.app/painel">Ir para o painel</Button>
+          <Button href="/painel">Ir para o painel</Button>
           {session && (
             <ManagerSignOut
               to={await managerHref("/entrar")}
