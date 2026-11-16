@@ -23,7 +23,7 @@ npm run dev
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Vercel (Production e Preview) | Bucket privado do Cloudflare R2 com os originais. Sem elas, a Vercel mostra o envio como "não ativo" e o desenvolvimento local grava em `./.storage` |
 | `WORKER_URL`, `WORKER_SECRET` | Vercel (Production e Preview) | Serviço de rostos no Fly.io (`worker/`). Sem elas, a busca por selfie não aparece na página pública |
 | `GOOGLE_API_KEY` | Vercel e GitHub (secret do worker) | Chave de API do Google com a Drive API ligada. Lê pastas compartilhadas como "Qualquer pessoa com o link" (verificação no Admin e cópia no worker). Sem ela, o card de pastas do Drive não aparece |
-| `NOSSAFOTO_EQUIPE` | Vercel (Production) | E-mails da equipe NossaFoto, separados por vírgula, que veem os pedidos de assinatura em `/equipe/leads`. Sem ela, ninguém vê a lista (os pedidos continuam sendo gravados) |
+| `NOSSAFOTO_EQUIPE` | Vercel (Production) | E-mails da equipe NossaFoto, separados por vírgula, que entram no Manager (`/manager`: contas, organizações, planos e pedidos de assinatura). Sem ela, ninguém entra |
 | `STORAGE_DRIVER=local`, `LOCAL_STORAGE_DIR` | Só local | Força o disco local mesmo com `next start` (testes de ponta a ponta) |
 
 Nenhum valor real vai para o repositório.
@@ -84,3 +84,11 @@ Cada acervo começa privado. No Admin, "Abrir por link" muda a visibilidade para
 ## Busca por selfie
 
 Na página pública, a pessoa marca o consentimento, tira (ou escolhe) uma selfie, o navegador a reduz para 1280 px e envia para `POST /api/publico/{org}/{acervo}/buscar`. A rota só aceita acervo aberto por link, limita 10 buscas por minuto por IP e 120 por minuto por acervo, repassa a selfie ao serviço de rostos (que compara só com o acervo da URL) e devolve apenas fotos desse acervo. O registro guarda só a contagem de resultados.
+
+## Manager (área da equipe)
+
+A área interna da equipe fica em `/manager`, no mesmo domínio do app (por exemplo,
+o domínio padrão da Vercel + `/manager`). Só entra quem tiver o e-mail em `NOSSAFOTO_EQUIPE`.
+
+Opcional, no futuro: um subdomínio `manager.<domínio>` também funciona. O `proxy.ts`
+serve cada caminho dele pelas rotas de `app/manager`. Basta adicionar o domínio na Vercel.
