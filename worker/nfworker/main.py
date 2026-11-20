@@ -22,7 +22,19 @@ log = logging.getLogger("nfworker")
 
 def connect():
     # prepare_threshold=None: compatível com o pooler do Neon.
-    return psycopg.connect(config.DATABASE_URL, prepare_threshold=None)
+    # Keepalive e tcp_user_timeout: sem eles, uma conexão que o Neon derruba enquanto
+    # está ociosa deixa a próxima consulta esperando para sempre, e o ciclo do Drive
+    # (ou o da indexação) para sem nenhum erro no log.
+    return psycopg.connect(
+        config.DATABASE_URL,
+        prepare_threshold=None,
+        connect_timeout=15,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=3,
+        tcp_user_timeout=60000,
+    )
 
 
 class State:
@@ -33,6 +45,9 @@ class State:
     drive_wake = threading.Event()
     last_error: str | None = None
     indexed = 0
+    index_beat: float | None = None
+    drive_beat: float | None = None
+    drive_error: str | None = None
 
 
 state = State()
@@ -49,6 +64,7 @@ def index_loop():
                 indexer.requeue_stuck(conn)
                 last_requeue = time.monotonic()
             done = indexer.run_once(conn, state.engine, state.storage)
+            state.index_beat = time.time()
             state.indexed += done
             state.last_error = None
             if done == 0:
@@ -83,13 +99,16 @@ def drive_loop():
                 drive.requeue_stuck(conn)
                 last_requeue = time.monotonic()
             queued = drive.run_once(conn, client, state.storage)
+            state.drive_beat = time.time()
+            state.drive_error = None
             if queued > 0:
                 state.wake.set()
             if queued < 0:
                 state.drive_wake.wait(60)
                 state.drive_wake.clear()
-        except Exception:
+        except Exception as exc:
             log.exception("erro no ciclo do Google Drive")
+            state.drive_error = type(exc).__name__
             try:
                 if conn is not None:
                     conn.close()
@@ -148,7 +167,18 @@ def status(authorization: str | None = Header(default=None)):
     authorize(authorization)
     with connect() as conn:
         rows = conn.execute("select status::text, count(*) from photos group by status").fetchall()
-    return {"model": config.MODEL_VERSION, "indexed_since_start": state.indexed, "last_error": state.last_error, "photos": {s: n for s, n in rows}}
+    now = time.time()
+    ago = lambda t: None if t is None else round(now - t)  # noqa: E731
+    return {
+        "model": config.MODEL_VERSION,
+        "indexed_since_start": state.indexed,
+        "last_error": state.last_error,
+        "photos": {s: n for s, n in rows},
+        "index_loop_seconds_ago": ago(state.index_beat),
+        "drive_enabled": bool(config.GOOGLE_API_KEY),
+        "drive_loop_seconds_ago": ago(state.drive_beat),
+        "drive_error": state.drive_error,
+    }
 
 
 @app.post("/wake")
