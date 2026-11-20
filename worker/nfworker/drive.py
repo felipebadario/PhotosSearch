@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import logging
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,6 +28,13 @@ class DriveError(Exception):
     """Erro com mensagem para mostrar ao cliente no Admin."""
 
 
+class FileUnavailable(Exception):
+    """Um arquivo da pasta não pôde ser baixado. Os outros seguem normalmente."""
+
+
+RETRY_CODES = {429, 500, 502, 503, 504}
+
+
 @dataclass
 class DriveFile:
     id: str
@@ -44,16 +52,30 @@ class DriveClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    def _get(self, url: str, keys: dict[str, str], timeout: float = 30):
+    def _get(self, url: str, keys: dict[str, str], timeout: float = 30, folder: bool = True):
         req = urllib.request.Request(url)
         if keys:
             req.add_header("X-Goog-Drive-Resource-Keys", ",".join(f"{k}/{v}" for k, v in keys.items()))
-        try:
-            return urllib.request.urlopen(req, timeout=timeout)
-        except urllib.error.HTTPError as exc:
-            if exc.code in (403, 404):
-                raise DriveError("Não conseguimos abrir a pasta. Confira se ela continua compartilhada como “Qualquer pessoa com o link”.") from exc
-            raise
+        for attempt in range(4):
+            try:
+                return urllib.request.urlopen(req, timeout=timeout)
+            except urllib.error.HTTPError as exc:
+                if exc.code in RETRY_CODES and attempt < 3:
+                    time.sleep(2 ** attempt * 2)
+                    continue
+                if exc.code in (403, 404):
+                    if folder:
+                        raise DriveError("Não conseguimos abrir a pasta. Confira se ela continua compartilhada como “Qualquer pessoa com o link”.") from exc
+                    # Um arquivo sem permissão ou com a cota de download do Google
+                    # estourada não pode derrubar a pasta inteira.
+                    raise FileUnavailable(f"HTTP {exc.code}") from exc
+                raise
+            except (urllib.error.URLError, TimeoutError) as exc:
+                if attempt < 3:
+                    time.sleep(2 ** attempt * 2)
+                    continue
+                raise
+        raise RuntimeError("inalcançável")
 
     def list_children(self, folder_id: str, resource_key: str | None):
         keys = {folder_id: resource_key} if resource_key else {}
@@ -79,7 +101,7 @@ class DriveClient:
     def download(self, file_id: str, resource_key: str | None) -> bytes:
         params = urllib.parse.urlencode({"alt": "media", "supportsAllDrives": "true", "key": self.api_key})
         keys = {file_id: resource_key} if resource_key else {}
-        with self._get(f"{API}/{urllib.parse.quote(file_id)}?{params}", keys, timeout=120) as res:
+        with self._get(f"{API}/{urllib.parse.quote(file_id)}?{params}", keys, timeout=120, folder=False) as res:
             data = res.read(config.MAX_PHOTO_BYTES + 1)
         if len(data) > config.MAX_PHOTO_BYTES:
             raise ValueError("Arquivo maior que o limite de 30 MB.")
@@ -112,6 +134,8 @@ def walk(client, folder_id: str, resource_key: str | None) -> list[DriveFile]:
                 return found
     return found
 
+
+PROGRESS_EVERY = 10
 
 # ── Banco ──
 
@@ -223,11 +247,28 @@ def sync_source(conn, client, storage: Storage, source: dict) -> int:
         conn.commit()
         return 0
 
+    # Mostra no Admin quantas fotos a pasta tem logo depois de listar, e o andamento
+    # da cópia a cada poucas fotos. Antes os números só mudavam no fim da conferência,
+    # e uma pasta grande parecia travada em "Copiando fotos…".
+    conn.execute("update drive_sources set files_seen = %s, last_synced_at = now() where id = %s", (len(files), source["id"]))
+    conn.commit()
+
     albums: dict = {}
     queued = 0
     imported = 0
+    flushed = 0
+    last_flush = time.monotonic()
     full = False
-    for file in files:
+    for n, file in enumerate(files):
+        if imported > flushed and (n % PROGRESS_EVERY == 0 or time.monotonic() - last_flush > 15):
+            # last_synced_at serve de batimento: impede que requeue_stuck devolva
+            # para a fila uma pasta grande que ainda está sendo copiada.
+            conn.execute(
+                "update drive_sources set files_imported = files_imported + %s, last_synced_at = now() where id = %s",
+                (imported - flushed, source["id"]),
+            )
+            conn.commit()
+            flushed, last_flush = imported, time.monotonic()
         try:
             album = album_id(conn, albums, org, col, file.album)
             photo = existing_photo(conn, org, file, file.sha256)
@@ -268,6 +309,9 @@ def sync_source(conn, client, storage: Storage, source: dict) -> int:
         except DriveError:
             conn.rollback()
             raise
+        except FileUnavailable as exc:
+            conn.rollback()
+            log.warning("drive: arquivo %s indisponível (%s), segue para o próximo", file.id, exc)
         except Exception:
             conn.rollback()
             log.exception("drive: falha ao copiar %s", file.id)
@@ -280,7 +324,7 @@ def sync_source(conn, client, storage: Storage, source: dict) -> int:
           last_error = %s, last_synced_at = now(), files_seen = %s, files_imported = files_imported + %s
         where id = %s
         """,
-        (error, error, len(files), imported, source["id"]),
+        (error, error, len(files), imported - flushed, source["id"]),
     )
     conn.commit()
     log.info("drive: pasta %s conferida, %s arquivos, %s novas na fila", source["id"], len(files), queued)

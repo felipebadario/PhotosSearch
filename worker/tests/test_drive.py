@@ -1,4 +1,7 @@
 import hashlib
+import os
+
+import psycopg
 
 import pytest
 
@@ -184,3 +187,41 @@ def test_fotos_da_pasta_sao_indexadas(conn, org, storage, tree, engine):
     add_source(conn, org)
     drive.run_once(conn, tree, storage)
     assert indexer.run_once(conn, engine, storage) == 3
+
+
+def test_arquivo_indisponivel_nao_para_a_pasta(conn, org, storage, tree):
+    """Um 403 no download de uma foto (cota do Google, arquivo sem permissão) pula só aquela foto."""
+    original = tree.download
+
+    def download(file_id, resource_key):
+        if file_id == "b":
+            raise drive.FileUnavailable("HTTP 403")
+        return original(file_id, resource_key)
+
+    tree.download = download
+    sid = add_source(conn, org)
+    assert drive.run_once(conn, tree, storage) == 2
+    status, error, seen, imported, _ = source_row(conn, sid)
+    assert (status, error, seen, imported) == ("ok", None, 3, 2)
+    names = {r[0] for r in conn.execute("select original_name from photos where organization_id = %s", (org["id"],)).fetchall()}
+    assert names == {"a.jpg", "c.png"}
+
+
+def test_mostra_o_andamento_durante_a_copia(conn, org, storage, monkeypatch):
+    contents = {f"f{i}": f"faces:{i}".encode() for i in range(25)}
+    fake = FakeDrive({"raiz": [img(f, f"{f}.jpg", contents=contents) for f in contents]}, contents)
+    monkeypatch.setattr(drive, "PROGRESS_EVERY", 10)
+    sid = add_source(conn, org)
+    seen_progress = []
+    original = fake.download
+
+    def download(file_id, resource_key):
+        with psycopg.connect(os.environ["DATABASE_URL"]) as other:
+            seen_progress.append(other.execute("select files_seen, files_imported from drive_sources where id = %s", (sid,)).fetchone())
+        return original(file_id, resource_key)
+
+    fake.download = download
+    assert drive.run_once(conn, fake, storage) == 25
+    assert seen_progress[0] == (25, 0)
+    assert (25, 10) in seen_progress and (25, 20) in seen_progress
+    assert source_row(conn, sid)[2:4] == (25, 25)
