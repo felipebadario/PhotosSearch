@@ -15,7 +15,8 @@ jobs:
       - name: Máquina
         run: flyctl machine list --app nossafoto-worker
       - name: Status (contagens)
-        run: curl -s -m 20 -H "Authorization: Bearer $WORKER_SECRET" https://nossafoto-worker.fly.dev/status | python3 -m json.tool
+        run: |
+          curl -s -m 20 -H "Authorization: Bearer $WORKER_SECRET" https://nossafoto-worker.fly.dev/status | python3 -m json.tool
       - name: Tempos recentes
         run: |
           flyctl logs --app nossafoto-worker --no-tail 2>/dev/null \
