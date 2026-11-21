@@ -6,8 +6,10 @@ import { SelfieError, searchSelfie, workerConfigured } from "@/lib/server/worker
 
 const MAX_SELFIE_BYTES = 4 * 1024 * 1024; // o navegador reduz a selfie antes de enviar
 const MAX_SELFIES = 3; // ex.: com e sem óculos, de frente e de lado
-const PER_COLLECTION_PER_MINUTE = 120;
-const PER_IP_PER_MINUTE = 10;
+// Pensado para eventos: ~100 pessoas no mesmo minuto, cada uma podendo refinar com até 3 fotos.
+const PER_COLLECTION_PER_MINUTE = 600;
+// Num evento muita gente sai pelo mesmo IP (Wi-Fi do local, CGNAT da operadora).
+const PER_IP_PER_MINUTE = 60;
 
 // Limite por IP em memória: protege cada instância; o limite por acervo (no banco) vale para todas.
 const hits = new Map<string, number[]>();
