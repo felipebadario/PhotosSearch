@@ -5,6 +5,7 @@ import { createPhotoToken } from "@/lib/server/public-photo-token";
 import { SelfieError, searchSelfie, workerConfigured } from "@/lib/server/worker";
 
 const MAX_SELFIE_BYTES = 4 * 1024 * 1024; // o navegador reduz a selfie antes de enviar
+const MAX_SELFIES = 3; // ex.: com e sem óculos, de frente e de lado
 const PER_COLLECTION_PER_MINUTE = 120;
 const PER_IP_PER_MINUTE = 10;
 
@@ -42,12 +43,13 @@ export async function POST(req: Request, route: RouteContext<"/api/publico/[org]
     return json({ error: "Não foi possível ler a selfie. Tente de novo." }, 400);
   }
   if (form.get("consent") !== "1") return json({ error: "Confirme que concorda em usar sua selfie só para esta busca." }, 400);
-  const selfie = form.get("selfie");
-  if (!(selfie instanceof Blob) || selfie.size === 0) return json({ error: "Envie uma selfie." }, 400);
-  if (selfie.size > MAX_SELFIE_BYTES) return json({ error: "A selfie é grande demais. Tente outra." }, 413);
+  const selfies = form.getAll("selfie").filter((s): s is File => typeof s !== "string" && s.size > 0);
+  if (selfies.length === 0) return json({ error: "Envie uma selfie." }, 400);
+  if (selfies.length > MAX_SELFIES) return json({ error: `Envie no máximo ${MAX_SELFIES} fotos suas.` }, 400);
+  if (selfies.some((s) => s.size > MAX_SELFIE_BYTES)) return json({ error: "A selfie é grande demais. Tente outra." }, 413);
 
   try {
-    const matches = await searchSelfie(selfie, collection.organizationId, collection.id, collection.matchThreshold);
+    const matches = await searchSelfie(selfies, collection.organizationId, collection.id, collection.matchThreshold);
     const rows = await getPublicPhotosByIds(db, collection, matches.map((m) => m.photo_id));
     const byId = new Map(rows.map((r) => [r.id, r]));
     const photos = matches.flatMap((m) => {

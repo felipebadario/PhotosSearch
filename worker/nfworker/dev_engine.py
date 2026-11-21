@@ -6,7 +6,7 @@ import io
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 
-from .config import EMBEDDING_DIM
+from .config import EMBEDDING_DIM, MODEL_VERSION
 from .engine import DetectedFace, InvalidImage
 
 
@@ -24,6 +24,8 @@ def _embedding(data: bytes) -> np.ndarray:
 
 
 class DevColorEngine:
+    version = MODEL_VERSION
+
     def index_faces(self, data: bytes):
         return [DetectedFace(_embedding(data), [0.0, 0.0, 1.0, 1.0], 0.99)]
 

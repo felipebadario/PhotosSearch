@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, ImagePlus, Loader2, RotateCcw, ShieldCheck } from "lucide-react";
+import { Camera, ImagePlus, Loader2, RotateCcw, ShieldCheck, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { PhotoGrid } from "@/components/photos/PhotoGrid";
 import { plural } from "@/lib/format";
@@ -10,6 +10,8 @@ import type { GalleryPhoto } from "@/lib/types";
 type Result = { photos: { id: string; token: string; albumName: string | null; takenAt: string | null }[]; pending: number; searchable: number };
 
 const MAX_SIDE = 1280;
+/** Até 3 fotos da pessoa: ajuda quando a selfie é com óculos e as fotos não (ou o contrário), ou de lado. */
+const MAX_SELFIES = 3;
 
 /** Reduz a selfie no próprio aparelho: envia menos dados e o tamanho não passa do limite do servidor. */
 async function shrink(file: File): Promise<Blob> {
@@ -28,6 +30,8 @@ export function FaceSearch({ orgSlug, collectionSlug, allowDownload }: { orgSlug
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  // As selfies ficam só na memória desta página (para refinar a busca) e somem ao sair dela.
+  const [selfies, setSelfies] = useState<Blob[]>([]);
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
 
@@ -44,12 +48,15 @@ export function FaceSearch({ orgSlug, collectionSlug, allowDownload }: { orgSlug
       } catch {
         throw new Error("Não foi possível abrir essa foto. Tente outra selfie.");
       }
+      // Com um resultado na tela, a foto nova se soma às anteriores; senão, começa do zero.
+      const next = result ? [...selfies, blob].slice(-MAX_SELFIES) : [blob];
       const form = new FormData();
-      form.set("selfie", blob, "selfie.jpg");
+      next.forEach((b, i) => form.append("selfie", b, `selfie-${i + 1}.jpg`));
       form.set("consent", "1");
       const res = await fetch(`${base}/buscar`, { method: "POST", body: form });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "A busca não respondeu agora. Tente de novo em instantes.");
+      setSelfies(next);
       setResult(data as Result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "A busca não respondeu agora. Tente de novo em instantes.");
@@ -72,20 +79,37 @@ export function FaceSearch({ orgSlug, collectionSlug, allowDownload }: { orgSlug
       takenAt: p.takenAt,
     })) ?? [];
 
+  const inputs = (
+    <>
+      <input ref={cameraRef} type="file" accept="image/*" capture="user" className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => search(e.target.files?.[0])} />
+      <input ref={libraryRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => search(e.target.files?.[0])} />
+    </>
+  );
+
   if (result) {
+    const canRefine = selfies.length < MAX_SELFIES;
     return (
       <section aria-labelledby="resultado" className="mb-8 rounded-nf-lg border border-nf-line bg-nf-surface p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="resultado" className="text-lg font-semibold text-nf-text">
             {gallery.length > 0 ? `Encontramos ${plural(gallery.length, "foto", "fotos")} com você` : "Não encontramos fotos com você"}
           </h2>
-          <Button variant="secondary" size="sm" icon={<RotateCcw size={15} aria-hidden />} onClick={() => setResult(null)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<RotateCcw size={15} aria-hidden />}
+            onClick={() => {
+              setResult(null);
+              setSelfies([]);
+              setError(null);
+            }}
+          >
             Buscar de novo
           </Button>
         </div>
         {gallery.length === 0 ? (
           <p className="mt-2 text-sm text-nf-muted">
-            Tente outra selfie, com o rosto de frente e bem iluminado.
+            Tente com o rosto de frente e bem iluminado, ou adicione outra foto sua abaixo.
             {result.pending > 0 && ` Ainda estamos preparando ${plural(result.pending, "foto", "fotos")}: volte daqui a pouco.`}
           </p>
         ) : (
@@ -96,7 +120,36 @@ export function FaceSearch({ orgSlug, collectionSlug, allowDownload }: { orgSlug
             </div>
           </>
         )}
-        <p className="mt-4 text-xs text-nf-subtle">Sua selfie já foi descartada. Ela não foi guardada.</p>
+        {canRefine && (
+          <div className="mt-5 rounded-nf border border-nf-line bg-nf-sunken p-4">
+            <p className="flex items-center gap-2 text-sm font-medium text-nf-text">
+              <UserPlus size={16} aria-hidden /> Faltou alguma foto?
+            </p>
+            <p className="mt-1 text-sm text-nf-muted">
+              Adicione outra foto sua, de preferência diferente da primeira: sem óculos (ou com), de lado, com outro cabelo. Procuramos de novo usando
+              {selfies.length === 1 ? " as duas" : " todas"}, sem perder o rigor.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => cameraRef.current?.click()} icon={busy ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Camera size={15} aria-hidden />}>
+                {busy ? "Procurando..." : "Tirar outra selfie"}
+              </Button>
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => libraryRef.current?.click()} icon={<ImagePlus size={15} aria-hidden />}>
+                Escolher outra foto
+              </Button>
+            </div>
+          </div>
+        )}
+        {error && (
+          <p role="alert" className="mt-4 rounded-nf bg-nf-danger-soft px-3.5 py-3 text-sm text-nf-danger">
+            {error}
+          </p>
+        )}
+        {inputs}
+        <p className="mt-4 text-xs text-nf-subtle">
+          {selfies.length > 1
+            ? "Suas fotos não foram guardadas: o servidor as descarta na hora, e elas somem deste aparelho quando você sai da página."
+            : "Sua selfie não foi guardada: o servidor a descarta na hora, e ela some deste aparelho quando você sai da página."}
+        </p>
       </section>
     );
   }
@@ -121,8 +174,7 @@ export function FaceSearch({ orgSlug, collectionSlug, allowDownload }: { orgSlug
           Escolher uma foto
         </Button>
       </div>
-      <input ref={cameraRef} type="file" accept="image/*" capture="user" className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => search(e.target.files?.[0])} />
-      <input ref={libraryRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => search(e.target.files?.[0])} />
+      {inputs}
 
       {error && (
         <p role="alert" className="mx-auto mt-4 max-w-md rounded-nf bg-nf-danger-soft px-3.5 py-3 text-sm text-nf-danger">

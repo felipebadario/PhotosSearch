@@ -99,3 +99,32 @@ def test_duas_maquinas_nao_pegam_a_mesma_foto(conn, engine, storage, org):
         conn.commit()
         other.commit()
     assert len(a) == 3 and len(b) == 3 and not (a & b)
+
+
+def test_reindexa_fotos_do_modelo_antigo_sem_tirar_do_ar(conn, engine, storage, org):
+    photo = add_photo(conn, storage, org, "faces:1,2")
+    drain(conn, engine, storage, org)
+    conn.execute("update photos set model_version = %s where id = %s", (config.LEGACY_MODEL_VERSION, photo))
+    conn.execute("update faces set model_version = %s where photo_id = %s", (config.LEGACY_MODEL_VERSION, photo))
+    conn.commit()
+    assert indexer.reindex_pending(conn, config.MODEL_VERSION) >= 1
+    while indexer.reindex_once(conn, engine, storage, organization_id=org["id"]):
+        pass
+    assert status(conn, photo)[:2] == ("indexed", 2)
+    versions = conn.execute("select model_version from faces where photo_id = %s", (photo,)).fetchall()
+    assert versions == [(config.MODEL_VERSION,)] * 2
+    assert conn.execute("select model_version from photos where id = %s", (photo,)).fetchone()[0] == config.MODEL_VERSION
+
+
+def test_reindexacao_com_falha_mantem_os_rostos_antigos(conn, engine, storage, org):
+    photo = add_photo(conn, storage, org, "faces:1")
+    drain(conn, engine, storage, org)
+    conn.execute("update photos set model_version = %s where id = %s", (config.LEGACY_MODEL_VERSION, photo))
+    conn.execute("update faces set model_version = %s where photo_id = %s", (config.LEGACY_MODEL_VERSION, photo))
+    conn.commit()
+    key = conn.execute("select storage_key from photos where id = %s", (photo,)).fetchone()[0]
+    storage.objects[key] = b"instavel"
+    assert indexer.reindex_once(conn, engine, storage, organization_id=org["id"]) == 1
+    assert indexer.reindex_once(conn, engine, storage, organization_id=org["id"]) == 0  # não fica preso nela
+    assert conn.execute("select model_version from faces where photo_id = %s", (photo,)).fetchall() == [(config.LEGACY_MODEL_VERSION,)]
+    assert status(conn, photo)[0] == "indexed"

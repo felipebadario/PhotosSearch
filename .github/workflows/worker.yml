@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["worker/**", "face-search-service/app/**", "web/drizzle/**", ".github/workflows/worker.yml"]
+    paths: ["worker/**", "web/drizzle/**", ".github/workflows/worker.yml"]
   pull_request:
-    paths: ["worker/**", "face-search-service/app/**", "web/drizzle/**", ".github/workflows/worker.yml"]
+    paths: ["worker/**", "web/drizzle/**", ".github/workflows/worker.yml"]
 jobs:
   test:
     runs-on: ubuntu-latest
