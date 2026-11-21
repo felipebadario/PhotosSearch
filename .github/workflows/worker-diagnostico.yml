@@ -1,0 +1,23 @@
+name: Diagnóstico do worker
+# Manual: mostra a situação do worker no Fly sem expor dados de clientes (o repositório é público).
+# Imprime só contagens do /status, o estado da máquina e linhas de tempo do log (sem ids).
+on:
+  workflow_dispatch:
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      WORKER_SECRET: ${{ secrets.WORKER_SECRET }}
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Máquina
+        run: flyctl machine list --app nossafoto-worker
+      - name: Status (contagens)
+        run: curl -s -m 20 -H "Authorization: Bearer $WORKER_SECRET" https://nossafoto-worker.fly.dev/status | python3 -m json.tool
+      - name: Tempos recentes
+        run: |
+          flyctl logs --app nossafoto-worker --no-tail 2>/dev/null \
+            | grep -E "busca:|indexada:|reindexada:|Out of memory|oom|throttl|Starting|listening" \
+            | sed -E 's/[0-9a-f]{8}-[0-9a-f-]{27}/<id>/g' | tail -80

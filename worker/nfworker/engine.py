@@ -107,62 +107,78 @@ class InsightFaceEngine:
             return ort.InferenceSession(str(model_dir / name), sess_options=options, providers=["CPUExecutionProvider"])
 
         self.version = version
+        # Dois detectores (17 MB cada): a busca não espera a indexação de uma foto de grupo terminar.
+        # O reconhecedor é um só; o onnxruntime aceita chamadas simultâneas na mesma sessão.
         self.detector = SCRFD(session=session(detector_file))
         self.detector.prepare(ctx_id=0, input_size=selfie_size, det_thresh=config.DETECTION_THRESHOLD)
+        self.selfie_detector = SCRFD(session=session(detector_file))
+        self.selfie_detector.prepare(ctx_id=0, input_size=selfie_size, det_thresh=config.DETECTION_THRESHOLD)
         self.recognizer = ArcFaceONNX(model_file=str(model_dir / recognizer_file), session=session(recognizer_file))
         self.index_sizes = index_sizes
         self.selfie_size = selfie_size
         self.index_max_side = index_max_side
         self.flip_selfie = flip_selfie
-        # O detector guarda estado interno: uma inferência por vez.
-        self.lock = threading.Lock()
+        # O detector guarda estado interno: uma inferência por vez em cada um.
+        self.index_lock = threading.Lock()
+        self.selfie_lock = threading.Lock()
+        # Prioridade da busca: com uma busca em andamento, a indexação pausa entre um rosto e outro
+        # e devolve a CPU (a máquina tem 1 núcleo). Quem está esperando a selfie não espera a fila.
+        self._searching = 0
+        self._idle = threading.Condition()
 
-    def _faces(self, image, sizes):
-        from insightface.app.common import Face
+    def _yield_to_search(self):
+        with self._idle:
+            self._idle.wait_for(lambda: self._searching == 0, timeout=config.SEARCH_PRIORITY_MAX_WAIT)
 
-        with self.lock:
-            boxes, landmarks = self.detector.detect(image, input_size=sizes)
-            faces = []
-            for i, box in enumerate(boxes):
-                face = Face(bbox=box[:4], det_score=box[4], kps=landmarks[i])
-                self.recognizer.get(image, face)
-                faces.append(face)
-            return faces
-
-    def _flip_embedding(self, image, face) -> np.ndarray:
-        """Média do rosto com o espelho dele: o vetor fica menos sensível a pose e luz de um lado só."""
+    def _crop(self, image, kps):
         from insightface.utils import face_align
 
-        with self.lock:
-            crop = face_align.norm_crop(image, landmark=face.kps, image_size=self.recognizer.input_size[0])
-            feats = self.recognizer.get_feat([crop, np.ascontiguousarray(crop[:, ::-1, :])])
-        return feats.sum(axis=0)
+        return face_align.norm_crop(image, landmark=kps, image_size=self.recognizer.input_size[0])
 
     def index_faces(self, data: bytes) -> list[DetectedFace]:
+        self._yield_to_search()
         image = load_image(data, self.index_max_side)
+        with self.index_lock:
+            boxes, landmarks = self.detector.detect(image, input_size=self.index_sizes)
         out = []
-        for face in self._faces(image, self.index_sizes):
-            x1, y1, x2, y2 = (float(v) for v in face.bbox)
+        for box, kps in zip(boxes, landmarks):
+            x1, y1, x2, y2 = (float(v) for v in box[:4])
+            score = float(box[4])
             # Rosto minúsculo ou detecção duvidosa gera um vetor ruidoso, que cria falso positivo.
-            if min(x2 - x1, y2 - y1) < config.MIN_INDEX_FACE_PX or float(face.det_score) < config.MIN_INDEX_DET_SCORE:
+            # O filtro vem antes do reconhecedor: não gasta CPU com rostos que não serão gravados.
+            if min(x2 - x1, y2 - y1) < config.MIN_INDEX_FACE_PX or score < config.MIN_INDEX_DET_SCORE:
                 continue
+            self._yield_to_search()
             try:
-                embedding = normalize(face.embedding)
+                embedding = normalize(self.recognizer.get_feat(self._crop(image, kps))[0])
             except ValueError:
                 continue
-            out.append(DetectedFace(embedding, [x1, y1, x2, y2], float(face.det_score)))
+            out.append(DetectedFace(embedding, [x1, y1, x2, y2], score))
         return out
 
     def selfie_embedding(self, data: bytes) -> np.ndarray:
-        image = load_image(data, config.SELFIE_MAX_SIDE)
-        faces = self._faces(image, [self.selfie_size])
-        if not faces:
-            raise NoFace("Não detectamos um rosto. Tente outra selfie com o rosto bem iluminado.")
-        face = max(faces, key=lambda f: max(0, f.bbox[2] - f.bbox[0]) * max(0, f.bbox[3] - f.bbox[1]))
-        if min(face.bbox[2] - face.bbox[0], face.bbox[3] - face.bbox[1]) < config.MIN_SELFIE_FACE_PX:
-            raise NoFace("Seu rosto ficou pequeno na foto. Tire a selfie mais de perto.")
-        embedding = self._flip_embedding(image, face) if self.flip_selfie else face.embedding
-        return normalize(embedding)
+        with self._idle:
+            self._searching += 1
+        try:
+            image = load_image(data, config.SELFIE_MAX_SIDE)
+            with self.selfie_lock:
+                boxes, landmarks = self.selfie_detector.detect(image, input_size=[self.selfie_size])
+            if len(boxes) == 0:
+                raise NoFace("Não detectamos um rosto. Tente outra selfie com o rosto bem iluminado.")
+            i = int(np.argmax([(b[2] - b[0]) * (b[3] - b[1]) for b in boxes]))
+            x1, y1, x2, y2 = boxes[i][:4]
+            if min(x2 - x1, y2 - y1) < config.MIN_SELFIE_FACE_PX:
+                raise NoFace("Seu rosto ficou pequeno na foto. Tire a selfie mais de perto.")
+            crop = self._crop(image, landmarks[i])
+            if self.flip_selfie:
+                # Média do rosto com o espelho dele: menos sensível a pose e luz de um lado só.
+                feats = self.recognizer.get_feat([crop, np.ascontiguousarray(crop[:, ::-1, :])])
+                return normalize(feats.sum(axis=0))
+            return normalize(self.recognizer.get_feat(crop)[0])
+        finally:
+            with self._idle:
+                self._searching -= 1
+                self._idle.notify_all()
 
 
 def current_engine() -> InsightFaceEngine:
