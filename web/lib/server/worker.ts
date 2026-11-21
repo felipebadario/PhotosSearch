@@ -44,7 +44,7 @@ export async function searchSelfie(selfies: Blob[], organizationId: string, coll
     method: "POST",
     headers: { authorization: `Bearer ${secret()}` },
     body: form,
-    signal: AbortSignal.timeout(25_000),
+    signal: AbortSignal.timeout(45_000),
   });
   if (res.status === 413) throw new SelfieError("too_large", "A selfie é grande demais. Tente outra.");
   if (res.status === 422) {

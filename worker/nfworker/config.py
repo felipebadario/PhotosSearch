@@ -45,6 +45,8 @@ SMALL_FACE_PX = 48
 SMALL_FACE_PENALTY = float(os.environ.get("SMALL_FACE_PENALTY", "0.04"))
 MIN_SELFIE_FACE_PX = 64
 MAX_SELFIES = 3
+# Quanto a indexação espera, no máximo, uma busca terminar antes de seguir (segundos).
+SEARCH_PRIORITY_MAX_WAIT = 30
 
 # Limiares por modelo. Cada modelo tem a sua escala de semelhança, então o acervo guarda só o
 # nível escolhido (o valor antigo 0.38 / 0.45 / 0.52 do Admin) e o worker traduz para o modelo.

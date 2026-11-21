@@ -1,6 +1,7 @@
 """Fila de indexação: a própria tabela photos, com status queued → processing → indexed | error."""
 import json
 import logging
+import time
 
 import numpy as np
 
@@ -64,9 +65,11 @@ def _fail(conn, photo_id: str, attempts: int, message: str, permanent: bool):
 def index_photo(conn, engine: Engine, storage: Storage, photo) -> str:
     """Indexa uma foto reservada. Devolve o status final."""
     photo_id, organization_id, storage_key, attempts = photo
+    started = time.monotonic()
     try:
         data = storage.get(storage_key)
         detected = engine.index_faces(data)
+        log.info("indexada: %d rosto(s) em %.1fs", len(detected), time.monotonic() - started)
     except InvalidImage as exc:
         _fail(conn, photo_id, attempts, str(exc), permanent=True)
         return "error"
@@ -142,8 +145,10 @@ def reindex_once(conn, engine: Engine, storage: Storage, organization_id: str | 
         if not row:
             return 0
         photo_id, org_id, storage_key = row
+        started = time.monotonic()
         try:
             detected = engine.index_faces(storage.get(storage_key))
+            log.info("reindexada: %d rosto(s) em %.1fs", len(detected), time.monotonic() - started)
         except Exception:
             # Os rostos antigos ficam: a busca continua achando a foto pelo modelo anterior.
             log.exception("falha ao reindexar %s; mantém os rostos do modelo anterior", photo_id)

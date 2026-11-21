@@ -144,6 +144,7 @@ async def lifespan(_: FastAPI):
 
             state.engine = current_engine()
             state.storage = R2Storage()
+            threading.Thread(target=preload_legacy, name="legacy", daemon=True).start()
     if config.RUN_INDEXER:
         threading.Thread(target=index_loop, name="indexer", daemon=True).start()
         if config.GOOGLE_API_KEY:
@@ -202,6 +203,17 @@ def wake(authorization: str | None = Header(default=None)):
     return {"ok": True}
 
 
+def preload_legacy():
+    """Se ainda há rostos do modelo anterior, carrega o motor dele já na subida: a primeira busca não paga isso."""
+    try:
+        with connect() as conn:
+            row = conn.execute("select 1 from faces where model_version = %s limit 1", (config.LEGACY_MODEL_VERSION,)).fetchone()
+        if row:
+            _legacy_engine()
+    except Exception:
+        log.exception("não foi possível pré-carregar o motor anterior")
+
+
 def _legacy_engine() -> Engine:
     with state.legacy_lock:
         if state.legacy_engine is None:
@@ -244,6 +256,7 @@ async def search_selfie(
             raise HTTPException(status_code=413, detail="A selfie passa de 10 MB.")
         selfies.append(data)
     level = config.level_for(threshold)
+    started = time.monotonic()
     try:
         engine = state.engine
         queries = {getattr(engine, "version", config.MODEL_VERSION): _embed(engine, selfies)}
@@ -260,4 +273,7 @@ async def search_selfie(
         raise HTTPException(status_code=422, detail={"code": "no_face", "message": str(exc)})
     finally:
         del selfies
-    return {"matches": index.search(queries, level)}
+    matches = index.search(queries, level)
+    # Só tempos e contagens: nada da selfie nem do acervo vai para o log.
+    log.info("busca: %d selfie(s), %d resultado(s), modelos=%s, %.1fs", len(queries[next(iter(queries))]), len(matches), "+".join(sorted(queries)), time.monotonic() - started)
+    return {"matches": matches}
