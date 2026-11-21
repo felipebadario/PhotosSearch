@@ -1,9 +1,8 @@
-# Contexto de build: a raiz do repositório (o motor facial vem de face-search-service/app).
+# Contexto de build: a raiz do repositório.
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
-    MVP_STORAGE_DIR=/srv/engine-data \
-    PYTHONPATH=/srv/worker:/srv/engine
+    PYTHONPATH=/srv/worker
 
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential libgomp1 libglib2.0-0 libxcb1 \
     && rm -rf /var/lib/apt/lists/*
@@ -17,11 +16,14 @@ RUN pip install -r requirements.txt \
     && pip install --force-reinstall --no-deps "opencv-python-headless>=4.10,<6" \
     && python -c "import cv2; print('cv2', cv2.__version__)"
 
-COPY face-search-service/app /srv/engine/app
-COPY worker/nfworker /srv/worker/nfworker
+# Modelos dentro da imagem: o serviço sobe sem depender de download.
+# buffalo_l: só o detector det_10g e o reconhecedor w600k_r50 (os outros três não são usados).
+# buffalo_sc: o modelo anterior, usado só enquanto houver rostos antigos para reindexar.
+RUN python -c "from insightface.utils.storage import ensure_available as e; e('models', 'buffalo_l', root='/srv'); e('models', 'buffalo_sc', root='/srv')" \
+    && rm -f /srv/models/*.zip /srv/models/buffalo_l/1k3d68.onnx /srv/models/buffalo_l/2d106det.onnx /srv/models/buffalo_l/genderage.onnx \
+    && ls -la /srv/models/buffalo_l /srv/models/buffalo_sc
 
-# Baixa o modelo buffalo_sc na imagem: o serviço sobe sem depender de download.
-RUN python -c "from app.config import MODEL_ROOT, MODEL_NAME; from insightface.utils.storage import ensure_available; MODEL_ROOT.mkdir(parents=True, exist_ok=True); ensure_available('models', MODEL_NAME, root=str(MODEL_ROOT))"
+COPY worker/nfworker /srv/worker/nfworker
 
 EXPOSE 8080
 CMD ["uvicorn", "nfworker.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]

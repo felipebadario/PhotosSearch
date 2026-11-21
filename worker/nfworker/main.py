@@ -39,12 +39,16 @@ def connect():
 
 class State:
     engine: Engine | None = None
+    # Motor do modelo anterior: carregado só se um acervo ainda tiver rostos antigos.
+    legacy_engine: Engine | None = None
+    legacy_lock = threading.Lock()
     storage: Storage | None = None
     stop = threading.Event()
     wake = threading.Event()
     drive_wake = threading.Event()
     last_error: str | None = None
     indexed = 0
+    reindexed = 0
     index_beat: float | None = None
     drive_beat: float | None = None
     drive_error: str | None = None
@@ -67,6 +71,10 @@ def index_loop():
             state.index_beat = time.time()
             state.indexed += done
             state.last_error = None
+            if done == 0 and config.REINDEX:
+                # Fila vazia: aproveita para trocar rostos do modelo antigo pelos do atual.
+                done = indexer.reindex_once(conn, state.engine, state.storage)
+                state.reindexed += done
             if done == 0:
                 state.wake.wait(config.POLL_SECONDS)
                 state.wake.clear()
@@ -131,10 +139,10 @@ async def lifespan(_: FastAPI):
             state.engine = DevColorEngine()
             state.storage = LocalStorage()
         else:
-            from .engine import InsightFaceEngine
+            from .engine import current_engine
             from .storage import R2Storage
 
-            state.engine = InsightFaceEngine()
+            state.engine = current_engine()
             state.storage = R2Storage()
     if config.RUN_INDEXER:
         threading.Thread(target=index_loop, name="indexer", daemon=True).start()
@@ -167,11 +175,15 @@ def status(authorization: str | None = Header(default=None)):
     authorize(authorization)
     with connect() as conn:
         rows = conn.execute("select status::text, count(*) from photos group by status").fetchall()
+        reindex_pending = indexer.reindex_pending(conn, config.MODEL_VERSION)
     now = time.time()
     ago = lambda t: None if t is None else round(now - t)  # noqa: E731
     return {
         "model": config.MODEL_VERSION,
         "indexed_since_start": state.indexed,
+        "reindexed_since_start": state.reindexed,
+        "reindex_pending": reindex_pending,
+        "legacy_engine_loaded": state.legacy_engine is not None,
         "last_error": state.last_error,
         "photos": {s: n for s, n in rows},
         "index_loop_seconds_ago": ago(state.index_beat),
@@ -190,27 +202,62 @@ def wake(authorization: str | None = Header(default=None)):
     return {"ok": True}
 
 
+def _legacy_engine() -> Engine:
+    with state.legacy_lock:
+        if state.legacy_engine is None:
+            from .engine import legacy_engine
+
+            log.info("carregando o motor anterior para rostos ainda não reindexados")
+            state.legacy_engine = legacy_engine()
+        return state.legacy_engine
+
+
+def _embed(engine: Engine, selfies: list[bytes]):
+    """Vetores das selfies num motor. Selfie sem rosto é ignorada se outra servir."""
+    vectors, first_error = [], None
+    for data in selfies:
+        try:
+            vectors.append(engine.selfie_embedding(data))
+        except (InvalidImage, NoFace) as exc:
+            first_error = first_error or exc
+    if not vectors:
+        raise first_error
+    return vectors
+
+
 @app.post("/search")
 async def search_selfie(
-    selfie: UploadFile = File(...),
+    selfie: list[UploadFile] = File(...),
     organization_id: str = Form(...),
     collection_id: str = Form(...),
     threshold: float = Form(config.DEFAULT_THRESHOLD),
     authorization: str | None = Header(default=None),
 ):
+    """Uma a três selfies da mesma pessoa (ex.: com e sem óculos). Nada delas é gravado."""
     authorize(authorization)
-    data = await selfie.read(config.MAX_SELFIE_BYTES + 1)
-    if len(data) > config.MAX_SELFIE_BYTES:
-        raise HTTPException(status_code=413, detail="A selfie passa de 10 MB.")
-    threshold = min(max(threshold, 0.2), 0.9)
+    if len(selfie) > config.MAX_SELFIES:
+        raise HTTPException(status_code=422, detail={"code": "invalid_image", "message": f"Envie no máximo {config.MAX_SELFIES} selfies."})
+    selfies: list[bytes] = []
+    for upload in selfie:
+        data = await upload.read(config.MAX_SELFIE_BYTES + 1)
+        if len(data) > config.MAX_SELFIE_BYTES:
+            raise HTTPException(status_code=413, detail="A selfie passa de 10 MB.")
+        selfies.append(data)
+    level = config.level_for(threshold)
     try:
-        embedding = state.engine.selfie_embedding(data)
+        engine = state.engine
+        queries = {getattr(engine, "version", config.MODEL_VERSION): _embed(engine, selfies)}
+        with connect() as conn:
+            index = search.load_index(conn, organization_id, collection_id)
+        if config.LEGACY_MODEL_VERSION in index.versions and config.LEGACY_MODEL_VERSION not in queries:
+            try:
+                queries[config.LEGACY_MODEL_VERSION] = _embed(_legacy_engine(), selfies)
+            except (InvalidImage, NoFace):
+                pass  # o modelo antigo não achou o rosto: compara só com os rostos novos
     except InvalidImage as exc:
         raise HTTPException(status_code=422, detail={"code": "invalid_image", "message": str(exc)})
     except NoFace as exc:
         raise HTTPException(status_code=422, detail={"code": "no_face", "message": str(exc)})
     finally:
-        del data
-    with connect() as conn:
-        matches = search.search_collection(conn, organization_id, collection_id, embedding, threshold)
-    return {"matches": matches}
+        del selfies
+    return {"matches": index.search(queries, level)}

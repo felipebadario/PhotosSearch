@@ -28,7 +28,7 @@ class FakeEngine:
         if text == "instavel":
             raise RuntimeError("falha temporária")
         people = [int(p) for p in text.removeprefix("faces:").split(",") if p]
-        return [DetectedFace(unit(p), [0.0, 0.0, 10.0, 10.0], 0.9) for p in people]
+        return [DetectedFace(unit(p), [0.0, 0.0, 100.0, 100.0], 0.9) for p in people]
 
     def selfie_embedding(self, data: bytes):
         text = data.decode()

@@ -30,10 +30,13 @@ export async function wakeWorker() {
 
 export type WorkerMatch = { photo_id: string; similarity: number };
 
-/** Procura a selfie dentro de um acervo. A selfie passa só em memória e não é gravada. */
-export async function searchSelfie(selfie: Blob, organizationId: string, collectionId: string, threshold: number): Promise<WorkerMatch[]> {
+/**
+ * Procura a pessoa dentro de um acervo, com 1 a 3 selfies dela (ex.: com e sem óculos).
+ * As selfies passam só em memória e não são gravadas.
+ */
+export async function searchSelfie(selfies: Blob[], organizationId: string, collectionId: string, threshold: number): Promise<WorkerMatch[]> {
   const form = new FormData();
-  form.set("selfie", selfie, "selfie.jpg");
+  selfies.forEach((selfie, i) => form.append("selfie", selfie, `selfie-${i + 1}.jpg`));
   form.set("organization_id", organizationId);
   form.set("collection_id", collectionId);
   form.set("threshold", String(threshold));
